@@ -1,103 +1,184 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { SignedOut, SignInButton } from '@clerk/nextjs';
+import Image from 'next/image';
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6">
+        <Link href="/" className="text-3xl font-black tracking-tight">
+          GeoLearn AI
+        </Link>
+        <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-700 md:flex">
+          <Link
+            href="/"
+            className="border-b-2 border-[var(--color-primary)] pb-1 text-slate-900"
+          >
+            Home
+          </Link>
+          <Link href="/datasets">Datasets</Link>
+          <Link href="/tutor">Tutor</Link>
+          <Link href="/about">About</Link>
+        </nav>
+        <SignedOut>
+          <SignInButton>
+            <button
+              type="button"
+              className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold"
+            >
+              Sign In
+            </button>
+          </SignInButton>
+        </SignedOut>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 pb-20 pt-8 lg:grid-cols-2">
+        <div>
+          <h1 className="text-6xl font-black leading-[0.95] tracking-tight sm:text-7xl">
+            Your GIS Learning Assistant,{' '}
+            <span className="text-emerald-700">Built for Nigeria</span>
+          </h1>
+          <p className="mt-7 max-w-xl text-xl leading-8 text-slate-600">
+            Find free Nigerian geospatial datasets and get instant AI help with
+            QGIS, ArcGIS, and remote sensing workflows.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href="/datasets"
+              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 font-semibold text-white shadow-sm"
+            >
+              Explore Datasets
+            </Link>
+            <Link
+              href="/tutor"
+              className="rounded-lg border border-[var(--color-border)] bg-white px-6 py-3 font-semibold text-slate-800"
+            >
+              Try AI Tutor
+            </Link>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+        <div className="relative">
+          <div className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-950 to-emerald-800 p-4 shadow-2xl">
+            <Image
+              src="/nigeria-map.svg"
+              alt="Nigeria map"
+              width={640}
+              height={640}
+              className="h-auto w-full rounded-xl"
+              priority
+            />
+          </div>
+          <div className="absolute -bottom-6 left-6 max-w-xs rounded-xl border border-[var(--color-border)] bg-white/90 p-4 shadow-lg backdrop-blur">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+              AI Insights
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              I analyzed your Lagos coastline shapefile. Check for topology
+              errors before running weighted overlays.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[var(--color-primary)] py-10 text-white">
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 md:grid-cols-3">
+          <article>
+            <p className="text-6xl font-black">90%</p>
+            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+              Of GIS students struggle finding datasets
+            </p>
+          </article>
+          <article>
+            <p className="text-6xl font-black">100%</p>
+            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+              Found an AI tutor useful
+            </p>
+          </article>
+          <article>
+            <p className="text-6xl font-black">10,000+</p>
+            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+              Nigerian GIS students
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-6 py-20">
+        <div className="mb-10 flex items-end justify-between gap-6">
+          <h2 className="max-w-3xl text-5xl font-black leading-tight">
+            Expertise for the Nigerian Geospatial Landscape
+          </h2>
+          <p className="hidden text-sm text-slate-500 md:block">
+            Focusing on local data precision.
+          </p>
+        </div>
+        <div className="grid gap-5 md:grid-cols-3">
+          <article className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm">
+            <h3 className="text-2xl font-bold">Dataset Library</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Access high-quality Nigerian geospatial datasets including
+              administrative boundaries and satellite imagery.
+            </p>
+            <div className="mt-5 h-24 rounded-xl bg-[radial-gradient(circle_at_20%_20%,#d6e9dc,#e2e8f0_60%,#f1f5f9)]" />
+          </article>
+          <article className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-900 to-emerald-700 p-6 text-white shadow-lg">
+            <h3 className="text-2xl font-bold">AI GIS Tutor</h3>
+            <p className="mt-3 text-sm leading-6 text-emerald-100">
+              Solve GIS errors with step-by-step support for QGIS, ArcGIS, and
+              remote sensing tasks.
+            </p>
+            <div className="mt-5 rounded-lg bg-white/20 px-3 py-2 text-xs font-semibold">
+              AI Tutor Online
+            </div>
+          </article>
+          <article className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm">
+            <h3 className="text-2xl font-bold">YouTube Tutorials</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Integrated tutorial recommendations for visual learners with
+              context-aware video suggestions.
+            </p>
+            <div className="mt-5 h-24 rounded-xl bg-[radial-gradient(circle_at_10%_40%,#cbd5e1,#e2e8f0_55%,#f8fafc)]" />
+          </article>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-6 pb-20">
+        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-10 text-center">
+          <h3 className="text-4xl font-black">
+            Join the Next Generation of Nigerian GIS Experts
+          </h3>
+          <p className="mx-auto mt-4 max-w-xl text-slate-600">
+            Get monthly updates on new Nigerian datasets and GIS training
+            materials delivered to your inbox.
+          </p>
+          <form className="mx-auto mt-7 flex max-w-lg flex-col gap-3 sm:flex-row">
+            <input
+              type="email"
+              placeholder="Your academic email"
+              className="w-full rounded-lg border border-[var(--color-border)] bg-slate-50 px-4 py-3 text-sm outline-none"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 text-sm font-bold text-white"
+            >
+              Join Free
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <footer className="border-t border-[var(--color-border)] bg-slate-100">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-slate-600 md:flex-row">
+          <p className="font-bold text-slate-800">GeoLearn AI</p>
+          <div className="flex items-center gap-4">
+            <span>Privacy Policy</span>
+            <span>Terms of Service</span>
+            <span>Contact Support</span>
+          </div>
+          <p>© 2026 GeoLearn AI.</p>
+        </div>
       </footer>
-    </div>
+    </main>
   );
 }
