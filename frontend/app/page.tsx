@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { SignedOut, SignInButton } from '@clerk/nextjs';
+import { SignInButton } from '@clerk/nextjs';
 import Image from 'next/image';
+import { Show } from '@/components/show';
 
 export default function Home() {
   return (
@@ -20,7 +21,7 @@ export default function Home() {
           <Link href="/tutor">Tutor</Link>
           <Link href="/about">About</Link>
         </nav>
-        <SignedOut>
+        <Show when="signed-out">
           <SignInButton>
             <button
               type="button"
@@ -29,7 +30,15 @@ export default function Home() {
               Sign In
             </button>
           </SignInButton>
-        </SignedOut>
+        </Show>
+        <Show when="signed-in">
+          <Link
+            href="/dashboard"
+            className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Dashboard
+          </Link>
+        </Show>
       </header>
 
       <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 pb-20 pt-8 lg:grid-cols-2">

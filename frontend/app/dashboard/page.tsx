@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useUser, UserButton } from '@clerk/nextjs';
 import {
   askTutor,
@@ -239,9 +240,13 @@ export default function DashboardPage() {
                           className="rounded-lg border border-[var(--color-border)] p-2"
                         >
                           {video.thumbnail ? (
-                            <img
+                            <Image
+                              loader={({ src }) => src}
+                              unoptimized
                               src={video.thumbnail}
                               alt={video.title}
+                              width={320}
+                              height={160}
                               className="h-28 w-full rounded object-cover"
                             />
                           ) : null}

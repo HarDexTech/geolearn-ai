@@ -25,13 +25,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <ClerkProvider>
-        <body
-          className={`${sora.variable} ${spaceGrotesk.variable} antialiased`}
-        >
-          {children}
-        </body>
-      </ClerkProvider>
+      <body className={`${sora.variable} ${spaceGrotesk.variable} antialiased`}>
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }
