@@ -4,14 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUser, UserButton } from '@clerk/nextjs';
-import {
-  askTutor,
-  Dataset,
-  getDatasets,
-  getYoutubeVideos,
-  YoutubeVideo,
-} from '@/lib/api';
-import { useEffect } from 'react';
+import { askTutor, getYoutubeVideos, YoutubeVideo } from '@/lib/api';
 
 type Message = {
   id: string;
@@ -20,44 +13,12 @@ type Message = {
   videos?: YoutubeVideo[];
 };
 
-const categories = [
-  'all',
-  'administrative',
-  'climate',
-  'satellite',
-  'land-use',
-  'hydrology',
-  'hazard',
-  'raster',
-];
-
 export default function DashboardPage() {
   const { user } = useUser();
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('all');
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState('');
-  const [loadingDatasets, setLoadingDatasets] = useState(false);
   const [loadingTutor, setLoadingTutor] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        setLoadingDatasets(true);
-        const payload = await getDatasets({ query, category });
-        setDatasets(payload.datasets);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Could not load datasets.',
-        );
-      } finally {
-        setLoadingDatasets(false);
-      }
-    }
-    void load();
-  }, [query, category]);
 
   const canSend = useMemo(
     () => question.trim().length > 2 && !loadingTutor,
@@ -70,15 +31,15 @@ export default function DashboardPage() {
     }
 
     const prompt = question.trim();
-    setQuestion('');
-    setError(null);
-    setLoadingTutor(true);
-
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
       content: prompt,
     };
+
+    setQuestion('');
+    setError(null);
+    setLoadingTutor(true);
     setMessages((prev) => [...prev, userMessage]);
 
     try {
@@ -89,14 +50,27 @@ export default function DashboardPage() {
         name: user?.fullName ?? undefined,
       });
 
-      const youtube = await getYoutubeVideos(prompt);
+      const assistantMessageId = crypto.randomUUID();
       const assistantMessage: Message = {
-        id: crypto.randomUUID(),
+        id: assistantMessageId,
         role: 'assistant',
         content: tutor.answer,
-        videos: youtube.results,
+        videos: [],
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      try {
+        const youtube = await getYoutubeVideos(prompt);
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, videos: youtube.results }
+              : message,
+          ),
+        );
+      } catch {
+        // Keep AI tutor answer visible even if YouTube fetch fails.
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to get tutor response.',
@@ -121,68 +95,7 @@ export default function DashboardPage() {
         <UserButton />
       </header>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-6 pb-8 lg:grid-cols-[2fr_3fr]">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
-          <h2 className="text-4xl font-extrabold">Dataset Library</h2>
-          <div className="mt-5 space-y-3">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search Nigerian geospatial data..."
-              className="w-full rounded-xl border border-[var(--color-border)] bg-slate-100 px-4 py-3 text-sm outline-none focus:border-[var(--color-primary)]"
-            />
-            <div className="flex flex-wrap gap-2">
-              {categories.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setCategory(item)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition ${
-                    category === item
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-emerald-100 text-emerald-900'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {loadingDatasets ? (
-              <p className="text-sm text-slate-500">Loading datasets...</p>
-            ) : null}
-            {datasets.map((dataset) => (
-              <article
-                key={dataset.id}
-                className="rounded-xl border border-[var(--color-border)] bg-slate-50 p-4"
-              >
-                <p className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-800">
-                  {dataset.category}
-                </p>
-                <h3 className="mt-2 text-2xl font-bold">{dataset.name}</h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  {dataset.description}
-                </p>
-                <div className="mt-4 flex items-center justify-between text-xs">
-                  <span>
-                    Source: <strong>{dataset.source}</strong>
-                  </span>
-                  <a
-                    href={dataset.download_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg bg-[var(--color-primary)] px-4 py-2 font-semibold text-white"
-                  >
-                    Download
-                  </a>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-
+      <section className="mx-auto w-full max-w-4xl px-6 pb-8">
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
           <div className="flex items-center justify-between">
             <div>

@@ -31,6 +31,7 @@ export default function TutorPage() {
     }
 
     const question = prompt.trim();
+    const threadId = crypto.randomUUID();
     setPrompt('');
     setLoading(true);
     setError(null);
@@ -42,16 +43,29 @@ export default function TutorPage() {
         email: user?.primaryEmailAddress?.emailAddress,
         name: user?.fullName ?? undefined,
       });
-      const youtube = await getYoutubeVideos(question);
+
       setThreads((prev) => [
         {
-          id: crypto.randomUUID(),
+          id: threadId,
           prompt: question,
           response: tutor.answer,
-          videos: youtube.results,
+          videos: [],
         },
         ...prev,
       ]);
+
+      try {
+        const youtube = await getYoutubeVideos(question);
+        setThreads((prev) =>
+          prev.map((thread) =>
+            thread.id === threadId
+              ? { ...thread, videos: youtube.results }
+              : thread,
+          ),
+        );
+      } catch {
+        // YouTube is best-effort; do not block tutor response.
+      }
     } catch (err) {
       setError(
         err instanceof Error

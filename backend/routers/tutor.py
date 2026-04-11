@@ -1,4 +1,5 @@
 import os
+import re
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,14 +10,13 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import ChatHistory, User
 
-load_dotenv()
-
 router = APIRouter(prefix="/api", tags=["tutor"])
 
 SYSTEM_PROMPT = (
     "You are GeoLearn AI, an expert GIS tutor specializing in QGIS, ArcGIS, "
     "Remote Sensing, and Nigerian geospatial data. Give clear step-by-step answers."
 )
+UNAVAILABLE_MESSAGE = "All AI providers are currently unavailable. Please try again later."
 
 
 class TutorRequest(BaseModel):
@@ -31,28 +31,110 @@ class TutorResponse(BaseModel):
     chat_id: int
 
 
-def generate_answer(question: str) -> str:
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key or api_key == "your_groq_api_key_here":
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured.")
+def _is_placeholder(value: str) -> bool:
+    normalized = value.strip().lower()
+    if not normalized:
+        return True
+    if normalized.startswith("your_"):
+        return True
+    if "placeholder" in normalized:
+        return True
+    return normalized in {
+        "changeme",
+        "replace_me",
+        "your_api_key_here",
+        "your_groq_api_key_here",
+        "your_second_groq_key_here",
+        "your_gemini_api_key_here",
+        "your_second_gemini_api_key_here",
+    }
 
-    try:
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": question},
-            ],
-            temperature=0.2,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Groq request failed: {exc}") from exc
+
+def _scan_provider_keys(prefix: str) -> list[str]:
+    pattern = re.compile(rf"^{re.escape(prefix)}(?:_(\d+))?$")
+    indexed: list[tuple[int, str]] = []
+
+    for env_name, raw_value in os.environ.items():
+        match = pattern.match(env_name)
+        if not match or raw_value is None:
+            continue
+
+        suffix = match.group(1)
+        index = 1 if suffix is None else int(suffix)
+        if suffix is not None and index < 2:
+            continue
+
+        value = raw_value.strip()
+        if not value or _is_placeholder(value):
+            continue
+
+        indexed.append((index, value))
+
+    indexed.sort(key=lambda item: item[0])
+    return [value for _, value in indexed]
+
+
+def _call_groq(question: str, api_key: str) -> str:
+    client = Groq(api_key=api_key)
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": question},
+        ],
+        temperature=0.2,
+    )
 
     content = response.choices[0].message.content if response.choices else None
-    if not content:
-        raise HTTPException(status_code=502, detail="Groq returned an empty response.")
+    if not content or not content.strip():
+        raise RuntimeError("Groq returned an empty response.")
     return content.strip()
+
+
+def _call_gemini(question: str, api_key: str) -> str:
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:
+        raise RuntimeError("google-generativeai is not installed.") from exc
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=SYSTEM_PROMPT,
+    )
+
+    response = model.generate_content(question)
+    text = getattr(response, "text", None)
+    if text and text.strip():
+        return text.strip()
+
+    candidates = getattr(response, "candidates", None) or []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) or []
+        joined = "".join(getattr(part, "text", "") for part in parts).strip()
+        if joined:
+            return joined
+
+    raise RuntimeError("Gemini returned an empty response.")
+
+
+def generate_answer(question: str) -> str:
+    # Load latest env values at request time so newly added keys are picked up automatically.
+    load_dotenv(override=True)
+
+    providers: list[tuple[str, str]] = [("groq", key) for key in _scan_provider_keys("GROQ_API_KEY")]
+    providers.extend(("gemini", key) for key in _scan_provider_keys("GEMINI_API_KEY"))
+
+    for provider, key in providers:
+        try:
+            if provider == "groq":
+                return _call_groq(question, key)
+            return _call_gemini(question, key)
+        except Exception:
+            continue
+
+    raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE)
 
 
 @router.post("/tutor", response_model=TutorResponse)

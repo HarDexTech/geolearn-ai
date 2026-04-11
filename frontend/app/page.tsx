@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SignInButton } from '@clerk/nextjs';
+import { SignInButton, UserButton } from '@clerk/nextjs';
 import Image from 'next/image';
 import { Show } from '@/components/show';
 
@@ -32,12 +32,7 @@ export default function Home() {
           </SignInButton>
         </Show>
         <Show when="signed-in">
-          <Link
-            href="/dashboard"
-            className="rounded-full bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            Dashboard
-          </Link>
+          <UserButton />
         </Show>
       </header>
 
@@ -152,40 +147,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-6 pb-20">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-10 text-center">
-          <h3 className="text-4xl font-black">
-            Join the Next Generation of Nigerian GIS Experts
-          </h3>
-          <p className="mx-auto mt-4 max-w-xl text-slate-600">
-            Get monthly updates on new Nigerian datasets and GIS training
-            materials delivered to your inbox.
-          </p>
-          <form className="mx-auto mt-7 flex max-w-lg flex-col gap-3 sm:flex-row">
-            <input
-              type="email"
-              placeholder="Your academic email"
-              className="w-full rounded-lg border border-[var(--color-border)] bg-slate-50 px-4 py-3 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 text-sm font-bold text-white"
-            >
-              Join Free
-            </button>
-          </form>
-        </div>
-      </section>
-
       <footer className="border-t border-[var(--color-border)] bg-slate-100">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-slate-600 md:flex-row">
-          <p className="font-bold text-slate-800">GeoLearn AI</p>
-          <div className="flex items-center gap-4">
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
-            <span>Contact Support</span>
-          </div>
-          <p>© 2026 GeoLearn AI.</p>
+        <div className="mx-auto w-full max-w-7xl px-6 py-6 text-center text-sm text-slate-600">
+          <p>© 2026 GeoLearn AI. Built for Nigerian GIS students.</p>
         </div>
       </footer>
     </main>
