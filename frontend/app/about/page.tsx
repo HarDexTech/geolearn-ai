@@ -1,13 +1,35 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function AboutPage() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        !target.closest('[data-mobile-nav]') &&
+        !target.closest('[data-mobile-nav-toggle]')
+      ) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-2xl font-bold tracking-tight">
           GeoLearn AI
         </Link>
-        <nav className="flex items-center gap-6 text-sm font-semibold text-slate-700">
+        <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
@@ -15,7 +37,54 @@ export default function AboutPage() {
             About
           </span>
         </nav>
+        <button
+          type="button"
+          data-mobile-nav-toggle
+          onClick={() => setMobileNavOpen((prev) => !prev)}
+          className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+          aria-label="Toggle navigation menu"
+        >
+          ☰
+        </button>
       </header>
+
+      {mobileNavOpen ? (
+        <div className="mx-auto w-full max-w-6xl px-6 pb-2 md:hidden">
+          <nav
+            data-mobile-nav
+            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+          >
+            <Link
+              href="/"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Home
+            </Link>
+            <Link
+              href="/datasets"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Datasets
+            </Link>
+            <Link
+              href="/tutor"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Tutor
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-slate-900"
+            >
+              About
+            </Link>
+          </nav>
+        </div>
+      ) : null}
 
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-6 pb-24 pt-8 lg:grid-cols-2">
         <article className="rounded-2xl border border-[var(--color-border)] bg-white p-8 shadow-sm">

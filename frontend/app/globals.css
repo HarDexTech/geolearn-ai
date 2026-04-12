@@ -25,3 +25,7 @@ h3,
 h4 {
   font-family: var(--font-sora), 'Segoe UI', sans-serif;
 }
+
+button {
+  cursor: pointer;
+}

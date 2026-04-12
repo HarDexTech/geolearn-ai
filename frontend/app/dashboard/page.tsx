@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUser, UserButton } from '@clerk/nextjs';
@@ -18,12 +18,30 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState('');
   const [loadingTutor, setLoadingTutor] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSend = useMemo(
     () => question.trim().length > 2 && !loadingTutor,
     [question, loadingTutor],
   );
+
+  useEffect(() => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        !target.closest('[data-mobile-nav]') &&
+        !target.closest('[data-mobile-nav-toggle]')
+      ) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, []);
 
   async function handleAsk() {
     if (!canSend) {
@@ -92,8 +110,57 @@ export default function DashboardPage() {
           <Link href="/tutor">Tutor</Link>
           <Link href="/about">About</Link>
         </nav>
-        <UserButton />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-mobile-nav-toggle
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+            aria-label="Toggle navigation menu"
+          >
+            ☰
+          </button>
+          <UserButton />
+        </div>
       </header>
+
+      {mobileNavOpen ? (
+        <div className="mx-auto w-full max-w-7xl px-6 pb-2 md:hidden">
+          <nav
+            data-mobile-nav
+            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+          >
+            <Link
+              href="/"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Home
+            </Link>
+            <Link
+              href="/datasets"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Datasets
+            </Link>
+            <Link
+              href="/tutor"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Tutor
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              About
+            </Link>
+          </nav>
+        </div>
+      ) : null}
 
       <section className="mx-auto w-full max-w-4xl px-6 pb-8">
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">

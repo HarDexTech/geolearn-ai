@@ -34,6 +34,9 @@ export default function TutorPage() {
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(
     null,
   );
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSend = useMemo(
@@ -82,10 +85,34 @@ export default function TutorPage() {
     };
   }, [isLoaded, user?.id]);
 
+  useEffect(() => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      if (!target.closest('[data-session-menu]')) {
+        setOpenMenuId(null);
+      }
+
+      if (
+        !target.closest('[data-mobile-nav]') &&
+        !target.closest('[data-mobile-nav-toggle]')
+      ) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
+  }, []);
+
   async function openSession(sessionId: number) {
     setActiveSessionId(sessionId);
     setLoadingMessages(true);
     setError(null);
+    setOpenMenuId(null);
+    setSidebarOpen(false);
 
     try {
       const result = await getSessionMessages(sessionId);
@@ -114,11 +141,14 @@ export default function TutorPage() {
     setMessages([]);
     setPrompt('');
     setError(null);
+    setOpenMenuId(null);
+    setSidebarOpen(false);
   }
 
   async function handleDeleteSession(sessionId: number) {
     setDeletingSessionId(sessionId);
     setError(null);
+    setOpenMenuId(null);
 
     try {
       await deleteSession(sessionId);
@@ -229,11 +259,84 @@ export default function TutorPage() {
           </span>
           <Link href="/about">About</Link>
         </nav>
-        <UserButton />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-mobile-nav-toggle
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+            aria-label="Toggle navigation menu"
+          >
+            ☰
+          </button>
+          <UserButton />
+        </div>
       </header>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-6 pb-10 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+      {mobileNavOpen ? (
+        <div className="mx-auto w-full max-w-7xl px-6 pb-2 md:hidden">
+          <nav
+            data-mobile-nav
+            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+          >
+            <Link
+              href="/"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Home
+            </Link>
+            <Link
+              href="/datasets"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Datasets
+            </Link>
+            <Link
+              href="/tutor"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-slate-900"
+            >
+              Tutor
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              About
+            </Link>
+          </nav>
+        </div>
+      ) : null}
+
+      <div className="mx-auto w-full max-w-7xl px-6 pb-2 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen((prev) => !prev)}
+          className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+          aria-label="Toggle chat history sidebar"
+        >
+          ☰ Chat History
+        </button>
+      </div>
+
+      <section className="relative mx-auto grid w-full max-w-7xl gap-6 px-6 pb-10 lg:grid-cols-[280px_1fr]">
+        {sidebarOpen ? (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 bg-slate-900/30 lg:hidden"
+            aria-label="Close session sidebar"
+          />
+        ) : null}
+
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto border-r border-[var(--color-border)] bg-white p-4 transition-transform duration-300 lg:static lg:w-auto lg:rounded-2xl lg:border lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
           <button
             type="button"
             onClick={startNewChat}
@@ -251,6 +354,7 @@ export default function TutorPage() {
             {sessions.map((session) => (
               <div
                 key={session.id}
+                data-session-menu
                 className={`flex items-center gap-2 rounded-lg border p-2 ${
                   activeSessionId === session.id
                     ? 'border-[var(--color-primary)] bg-emerald-50'
@@ -264,20 +368,38 @@ export default function TutorPage() {
                 >
                   {session.title}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteSession(session.id)}
-                  disabled={deletingSessionId === session.id}
-                  className="text-xs font-semibold text-red-600 disabled:opacity-50"
-                >
-                  Del
-                </button>
+                <div className="relative" data-session-menu>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenMenuId((prev) =>
+                        prev === session.id ? null : session.id,
+                      )
+                    }
+                    className="rounded px-2 py-1 text-lg leading-none text-slate-600 hover:bg-slate-200"
+                    aria-label="Open session menu"
+                  >
+                    ⋯
+                  </button>
+                  {openMenuId === session.id ? (
+                    <div className="absolute right-0 top-9 z-[70] w-28 rounded-lg border border-[var(--color-border)] bg-white p-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSession(session.id)}
+                        disabled={deletingSessionId === session.id}
+                        className="w-full rounded-md px-2 py-1 text-left text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
         </aside>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+        <div className="relative rounded-2xl border border-[var(--color-border)] bg-white p-4">
           <div className="h-[68vh] space-y-5 overflow-y-auto rounded-xl bg-slate-50 p-4">
             {loadingMessages ? (
               <p className="text-sm text-slate-500">Loading messages...</p>
