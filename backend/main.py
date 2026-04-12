@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
@@ -7,9 +9,13 @@ from routers import datasets, tutor, youtube
 
 app = FastAPI(title="GeoLearn AI API")
 
+frontend_origin = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "http://localhost:3000")
+# NOTE: Tighten this allowlist for production deployments.
+allow_origins = list(dict.fromkeys([frontend_origin, "http://127.0.0.1:3000"]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

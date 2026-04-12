@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useUser, UserButton } from '@clerk/nextjs';
+import { useAuth, useUser, UserButton } from '@clerk/nextjs';
 import {
   askTutor,
   createSession,
@@ -23,6 +23,7 @@ type Message = {
 };
 
 export default function TutorPage() {
+  const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -44,6 +45,14 @@ export default function TutorPage() {
     [prompt, loadingSend],
   );
 
+  async function getAuthTokenOrThrow() {
+    const token = await getToken();
+    if (!token) {
+      throw new Error('Unable to authenticate request. Please sign in again.');
+    }
+    return token;
+  }
+
   useEffect(() => {
     if (!isLoaded || !user?.id) {
       return;
@@ -54,7 +63,8 @@ export default function TutorPage() {
     const fetchSessions = async () => {
       setLoadingSessions(true);
       try {
-        const result = await getSessions(user.id);
+        const token = await getAuthTokenOrThrow();
+        const result = await getSessions(user.id, token);
         if (!active) {
           return;
         }
@@ -115,7 +125,8 @@ export default function TutorPage() {
     setSidebarOpen(false);
 
     try {
-      const result = await getSessionMessages(sessionId);
+      const token = await getAuthTokenOrThrow();
+      const result = await getSessionMessages(sessionId, token);
       setMessages(
         result.messages.map((message) => ({
           id: String(message.id),
@@ -151,7 +162,8 @@ export default function TutorPage() {
     setOpenMenuId(null);
 
     try {
-      await deleteSession(sessionId);
+      const token = await getAuthTokenOrThrow();
+      await deleteSession(sessionId, token);
       setSessions((prev) => prev.filter((session) => session.id !== sessionId));
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
@@ -179,16 +191,20 @@ export default function TutorPage() {
     setError(null);
 
     try {
+      const token = await getAuthTokenOrThrow();
       let sessionId = activeSessionId;
 
       if (sessionId === null) {
         const title = question.slice(0, 50);
-        const created = await createSession({
-          user_id: user.id,
-          title,
-          email: user.primaryEmailAddress?.emailAddress,
-          name: user.fullName ?? undefined,
-        });
+        const created = await createSession(
+          {
+            user_id: user.id,
+            title,
+            email: user.primaryEmailAddress?.emailAddress,
+            name: user.fullName ?? undefined,
+          },
+          token,
+        );
 
         const newSessionId = created.session_id;
         sessionId = newSessionId;
@@ -203,13 +219,16 @@ export default function TutorPage() {
         ]);
       }
 
-      const tutor = await askTutor({
-        question,
-        user_id: user.id,
-        email: user.primaryEmailAddress?.emailAddress,
-        name: user.fullName ?? undefined,
-        session_id: sessionId,
-      });
+      const tutor = await askTutor(
+        {
+          question,
+          user_id: user.id,
+          email: user.primaryEmailAddress?.emailAddress,
+          name: user.fullName ?? undefined,
+          session_id: sessionId,
+        },
+        token,
+      );
 
       const messageId = String(tutor.chat_id);
       setMessages((prev) => [

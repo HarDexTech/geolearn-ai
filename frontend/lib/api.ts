@@ -35,13 +35,23 @@ export type SessionMessage = {
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  token?: string,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: 'no-store',
   });
 
@@ -79,17 +89,24 @@ export async function getDatasets(params?: {
   );
 }
 
-export async function askTutor(payload: {
-  question: string;
-  user_id: string;
-  email?: string;
-  name?: string;
-  session_id?: number;
-}): Promise<{ answer: string; chat_id: number }> {
-  return request<{ answer: string; chat_id: number }>('/api/tutor', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export async function askTutor(
+  payload: {
+    question: string;
+    user_id: string;
+    email?: string;
+    name?: string;
+    session_id?: number;
+  },
+  token?: string,
+): Promise<{ answer: string; chat_id: number }> {
+  return request<{ answer: string; chat_id: number }>(
+    '/api/tutor',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
 }
 
 export async function getYoutubeVideos(
@@ -107,38 +124,56 @@ export async function getChats(userId: string): Promise<{ chats: ChatItem[] }> {
   );
 }
 
-export async function createSession(payload: {
-  user_id: string;
-  title: string;
-  email?: string;
-  name?: string;
-}): Promise<{ session_id: number; title: string }> {
-  return request<{ session_id: number; title: string }>('/api/sessions', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+export async function createSession(
+  payload: {
+    user_id: string;
+    title: string;
+    email?: string;
+    name?: string;
+  },
+  token?: string,
+): Promise<{ session_id: number; title: string }> {
+  return request<{ session_id: number; title: string }>(
+    '/api/sessions',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
 }
 
 export async function getSessions(
   userId: string,
+  token?: string,
 ): Promise<{ sessions: SessionItem[] }> {
   return request<{ sessions: SessionItem[] }>(
     `/api/sessions/${encodeURIComponent(userId)}`,
+    undefined,
+    token,
   );
 }
 
 export async function deleteSession(
   sessionId: number,
+  token?: string,
 ): Promise<{ deleted: boolean }> {
-  return request<{ deleted: boolean }>(`/api/sessions/${sessionId}`, {
-    method: 'DELETE',
-  });
+  return request<{ deleted: boolean }>(
+    `/api/sessions/${sessionId}`,
+    {
+      method: 'DELETE',
+    },
+    token,
+  );
 }
 
 export async function getSessionMessages(
   sessionId: number,
+  token?: string,
 ): Promise<{ messages: SessionMessage[] }> {
   return request<{ messages: SessionMessage[] }>(
     `/api/sessions/${sessionId}/messages`,
+    undefined,
+    token,
   );
 }

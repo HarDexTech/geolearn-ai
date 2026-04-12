@@ -8,6 +8,7 @@ from groq import Groq
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from auth import get_current_user_id
 from database import get_db
 from models import ChatHistory, ChatSession, User
 
@@ -203,8 +204,12 @@ def _get_or_create_user(
 
 
 @router.post("/sessions", response_model=SessionCreateResponse)
-def create_session(payload: SessionCreateRequest, db: Session = Depends(get_db)) -> SessionCreateResponse:
-    user = _get_or_create_user(db, payload.user_id, payload.email, payload.name)
+def create_session(
+    payload: SessionCreateRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> SessionCreateResponse:
+    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
     title = payload.title.strip()[:50]
     if not title:
         raise HTTPException(status_code=422, detail="Session title cannot be empty.")
@@ -218,11 +223,15 @@ def create_session(payload: SessionCreateRequest, db: Session = Depends(get_db))
 
 
 @router.get("/sessions/{user_id}", response_model=SessionsResponse)
-def get_sessions(user_id: str, db: Session = Depends(get_db)) -> SessionsResponse:
+def get_sessions(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> SessionsResponse:
     sessions = (
         db.query(ChatSession)
         .join(User, User.id == ChatSession.user_id)
-        .filter(User.clerk_id == user_id)
+        .filter(User.clerk_id == current_user_id)
         .order_by(ChatSession.created_at.desc())
         .limit(30)
         .all()
@@ -237,10 +246,16 @@ def get_sessions(user_id: str, db: Session = Depends(get_db)) -> SessionsRespons
 
 
 @router.delete("/sessions/{session_id}")
-def delete_session(session_id: int, db: Session = Depends(get_db)) -> dict[str, bool]:
+def delete_session(
+    session_id: int,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found.")
+    if session.user is None or session.user.clerk_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     db.delete(session)
     db.commit()
@@ -248,7 +263,17 @@ def delete_session(session_id: int, db: Session = Depends(get_db)) -> dict[str, 
 
 
 @router.get("/sessions/{session_id}/messages", response_model=SessionMessagesResponse)
-def get_session_messages(session_id: int, db: Session = Depends(get_db)) -> SessionMessagesResponse:
+def get_session_messages(
+    session_id: int,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> SessionMessagesResponse:
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    if session.user is None or session.user.clerk_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     messages = (
         db.query(ChatHistory)
         .filter(ChatHistory.session_id == session_id)
@@ -289,10 +314,14 @@ def get_chats(user_id: str, db: Session = Depends(get_db)) -> ChatsResponse:
 
 
 @router.post("/tutor", response_model=TutorResponse)
-def tutor(payload: TutorRequest, db: Session = Depends(get_db)) -> TutorResponse:
+def tutor(
+    payload: TutorRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> TutorResponse:
     answer = generate_answer(payload.question)
 
-    user = _get_or_create_user(db, payload.user_id, payload.email, payload.name)
+    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
 
     session_id = payload.session_id
     if session_id is not None:
