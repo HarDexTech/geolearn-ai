@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUser, UserButton } from '@clerk/nextjs';
-import { askTutor, getYoutubeVideos, YoutubeVideo } from '@/lib/api';
+import { askTutor, getChats, getYoutubeVideos, YoutubeVideo } from '@/lib/api';
 
 type TutorThread = {
   id: string;
@@ -14,10 +14,11 @@ type TutorThread = {
 };
 
 export default function TutorPage() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [threads, setThreads] = useState<TutorThread[]>([]);
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSend = useMemo(
@@ -25,13 +26,61 @@ export default function TutorPage() {
     [prompt, loading],
   );
 
+  useEffect(() => {
+    if (!isLoaded || !user?.id) {
+      return;
+    }
+
+    let active = true;
+
+    const fetchChats = async () => {
+      setLoadingHistory(true);
+      try {
+        const result = await getChats(user.id);
+        if (!active) {
+          return;
+        }
+
+        const mappedThreads: TutorThread[] = result.chats
+          .map((chat) => ({
+            id: String(chat.id),
+            prompt: chat.question,
+            response: chat.answer,
+            videos: [],
+          }))
+          .reverse();
+
+        setThreads(mappedThreads);
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to load chat history right now.',
+        );
+      } finally {
+        if (active) {
+          setLoadingHistory(false);
+        }
+      }
+    };
+
+    void fetchChats();
+
+    return () => {
+      active = false;
+    };
+  }, [isLoaded, user?.id]);
+
   async function handleSend() {
     if (!canSend) {
       return;
     }
 
     const question = prompt.trim();
-    const threadId = crypto.randomUUID();
     setPrompt('');
     setLoading(true);
     setError(null);
@@ -44,14 +93,16 @@ export default function TutorPage() {
         name: user?.fullName ?? undefined,
       });
 
+      const threadId = String(tutor.chat_id);
+
       setThreads((prev) => [
+        ...prev,
         {
           id: threadId,
           prompt: question,
           response: tutor.answer,
           videos: [],
         },
-        ...prev,
       ]);
 
       try {
@@ -98,6 +149,9 @@ export default function TutorPage() {
         <aside className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
           <h2 className="text-lg font-bold">Chat History</h2>
           <div className="mt-3 space-y-2">
+            {loadingHistory ? (
+              <p className="text-sm text-slate-500">Loading chats...</p>
+            ) : null}
             {threads.length === 0 ? (
               <p className="text-sm text-slate-500">No chats yet.</p>
             ) : null}
@@ -115,6 +169,9 @@ export default function TutorPage() {
 
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
           <div className="h-[68vh] space-y-5 overflow-y-auto rounded-xl bg-slate-50 p-4">
+            {loadingHistory ? (
+              <p className="text-sm text-slate-500">Loading chat history...</p>
+            ) : null}
             {threads.length === 0 ? (
               <p className="text-sm text-slate-500">
                 Ask GeoLearn AI about QGIS, ArcGIS, remote sensing, or Nigerian

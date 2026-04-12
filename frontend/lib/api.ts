@@ -14,6 +14,13 @@ export type YoutubeVideo = {
   channel: string;
 };
 
+export type ChatItem = {
+  id: number;
+  question: string;
+  answer: string;
+  created_at: string;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -78,5 +85,11 @@ export async function getYoutubeVideos(
   const search = new URLSearchParams({ query });
   return request<{ count: number; results: YoutubeVideo[] }>(
     `/api/youtube?${search.toString()}`,
+  );
+}
+
+export async function getChats(userId: string): Promise<{ chats: ChatItem[] }> {
+  return request<{ chats: ChatItem[] }>(
+    `/api/chats/${encodeURIComponent(userId)}`,
   );
 }

@@ -49,13 +49,13 @@ export default function Home() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               href="/datasets"
-              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 font-semibold text-white shadow-sm"
+              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 font-semibold text-white shadow-sm transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
             >
               Explore Datasets
             </Link>
             <Link
               href="/tutor"
-              className="rounded-lg border border-[var(--color-border)] bg-white px-6 py-3 font-semibold text-slate-800"
+              className="rounded-lg border border-[var(--color-border)] bg-white px-6 py-3 font-semibold text-slate-800 transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
             >
               Try AI Tutor
             </Link>
@@ -63,13 +63,13 @@ export default function Home() {
         </div>
 
         <div className="relative">
-          <div className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-950 to-emerald-800 p-4 shadow-2xl">
+          <div className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-950 to-emerald-800 shadow-2xl transition-transform duration-700 hover:scale-[1.02]">
             <Image
-              src="/nigeria-map.svg"
-              alt="Nigeria map"
-              width={640}
-              height={640}
-              className="h-auto w-full rounded-xl"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2baMP8SqKWxvCczy68xIU5wj4zVPnyCk8MJkk0LeBpPcH12uK3GZELy80sg4tLFG4UJPhE1N3nA1yEiNVQhrXViyMbUomOVBooldZ3tWlZ5Yg6--5ualaHnuZD2160sgWa6DYTh4hCXeTJrkuLUPe9vTyjFrOWKkunOneIW0JIdVlSo2TdBfnDpAwgCYLV6USKfkw39m4pFV_W4IH_4r76CxRq8JDp5PN7AtHPb72KpzfM2IzyEmHwJQOWw6pZ-XqmbX-WuGhcxg"
+              alt="Satellite view of Nigerian landscape with digital data overlays and topological contour lines in emerald green tones"
+              width={1200}
+              height={800}
+              className="h-full w-full rounded-xl object-cover grayscale-[0.2] transition-all duration-700 hover:grayscale-0"
               priority
             />
           </div>

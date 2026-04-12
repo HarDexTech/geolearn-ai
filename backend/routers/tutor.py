@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
@@ -29,6 +30,17 @@ class TutorRequest(BaseModel):
 class TutorResponse(BaseModel):
     answer: str
     chat_id: int
+
+
+class ChatItem(BaseModel):
+    id: int
+    question: str
+    answer: str
+    created_at: datetime
+
+
+class ChatsResponse(BaseModel):
+    chats: list[ChatItem]
 
 
 def _is_placeholder(value: str) -> bool:
@@ -135,6 +147,30 @@ def generate_answer(question: str) -> str:
             continue
 
     raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE)
+
+
+@router.get("/chats/{user_id}", response_model=ChatsResponse)
+def get_chats(user_id: str, db: Session = Depends(get_db)) -> ChatsResponse:
+    chats = (
+        db.query(ChatHistory)
+        .join(User, User.id == ChatHistory.user_id)
+        .filter(User.clerk_id == user_id)
+        .order_by(ChatHistory.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    return ChatsResponse(
+        chats=[
+            ChatItem(
+                id=chat.id,
+                question=chat.question,
+                answer=chat.answer,
+                created_at=chat.created_at,
+            )
+            for chat in chats
+        ]
+    )
 
 
 @router.post("/tutor", response_model=TutorResponse)
