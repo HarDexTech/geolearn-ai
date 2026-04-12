@@ -4,26 +4,41 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useUser, UserButton } from '@clerk/nextjs';
-import { askTutor, getChats, getYoutubeVideos, YoutubeVideo } from '@/lib/api';
+import {
+  askTutor,
+  createSession,
+  deleteSession,
+  getSessionMessages,
+  getSessions,
+  getYoutubeVideos,
+  SessionItem,
+  YoutubeVideo,
+} from '@/lib/api';
 
-type TutorThread = {
+type Message = {
   id: string;
-  prompt: string;
-  response: string;
+  question: string;
+  answer: string;
   videos: YoutubeVideo[];
 };
 
 export default function TutorPage() {
   const { user, isLoaded } = useUser();
-  const [threads, setThreads] = useState<TutorThread[]>([]);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingSend, setLoadingSend] = useState(false);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const canSend = useMemo(
-    () => prompt.trim().length > 2 && !loading,
-    [prompt, loading],
+    () => prompt.trim().length > 2 && !loadingSend,
+    [prompt, loadingSend],
   );
 
   useEffect(() => {
@@ -33,24 +48,16 @@ export default function TutorPage() {
 
     let active = true;
 
-    const fetchChats = async () => {
-      setLoadingHistory(true);
+    const fetchSessions = async () => {
+      setLoadingSessions(true);
       try {
-        const result = await getChats(user.id);
+        const result = await getSessions(user.id);
         if (!active) {
           return;
         }
-
-        const mappedThreads: TutorThread[] = result.chats
-          .map((chat) => ({
-            id: String(chat.id),
-            prompt: chat.question,
-            response: chat.answer,
-            videos: [],
-          }))
-          .reverse();
-
-        setThreads(mappedThreads);
+        setSessions(result.sessions);
+        setActiveSessionId(null);
+        setMessages([]);
       } catch (err) {
         if (!active) {
           return;
@@ -59,59 +66,139 @@ export default function TutorPage() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Unable to load chat history right now.',
+            : 'Unable to load sessions right now.',
         );
       } finally {
         if (active) {
-          setLoadingHistory(false);
+          setLoadingSessions(false);
         }
       }
     };
 
-    void fetchChats();
+    void fetchSessions();
 
     return () => {
       active = false;
     };
   }, [isLoaded, user?.id]);
 
+  async function openSession(sessionId: number) {
+    setActiveSessionId(sessionId);
+    setLoadingMessages(true);
+    setError(null);
+
+    try {
+      const result = await getSessionMessages(sessionId);
+      setMessages(
+        result.messages.map((message) => ({
+          id: String(message.id),
+          question: message.question,
+          answer: message.answer,
+          videos: [],
+        })),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load messages for this session.',
+      );
+      setMessages([]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }
+
+  function startNewChat() {
+    setActiveSessionId(null);
+    setMessages([]);
+    setPrompt('');
+    setError(null);
+  }
+
+  async function handleDeleteSession(sessionId: number) {
+    setDeletingSessionId(sessionId);
+    setError(null);
+
+    try {
+      await deleteSession(sessionId);
+      setSessions((prev) => prev.filter((session) => session.id !== sessionId));
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to delete session right now.',
+      );
+    } finally {
+      setDeletingSessionId(null);
+    }
+  }
+
   async function handleSend() {
-    if (!canSend) {
+    if (!canSend || !user?.id) {
       return;
     }
 
     const question = prompt.trim();
     setPrompt('');
-    setLoading(true);
+    setLoadingSend(true);
     setError(null);
 
     try {
+      let sessionId = activeSessionId;
+
+      if (sessionId === null) {
+        const title = question.slice(0, 50);
+        const created = await createSession({
+          user_id: user.id,
+          title,
+          email: user.primaryEmailAddress?.emailAddress,
+          name: user.fullName ?? undefined,
+        });
+
+        const newSessionId = created.session_id;
+        sessionId = newSessionId;
+        setActiveSessionId(newSessionId);
+        setSessions((prev) => [
+          {
+            id: newSessionId,
+            title: created.title,
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
+
       const tutor = await askTutor({
         question,
-        user_id: user?.id ?? 'user_demo',
-        email: user?.primaryEmailAddress?.emailAddress,
-        name: user?.fullName ?? undefined,
+        user_id: user.id,
+        email: user.primaryEmailAddress?.emailAddress,
+        name: user.fullName ?? undefined,
+        session_id: sessionId,
       });
 
-      const threadId = String(tutor.chat_id);
-
-      setThreads((prev) => [
+      const messageId = String(tutor.chat_id);
+      setMessages((prev) => [
         ...prev,
         {
-          id: threadId,
-          prompt: question,
-          response: tutor.answer,
+          id: messageId,
+          question,
+          answer: tutor.answer,
           videos: [],
         },
       ]);
 
       try {
         const youtube = await getYoutubeVideos(question);
-        setThreads((prev) =>
-          prev.map((thread) =>
-            thread.id === threadId
-              ? { ...thread, videos: youtube.results }
-              : thread,
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === messageId
+              ? { ...message, videos: youtube.results }
+              : message,
           ),
         );
       } catch {
@@ -124,7 +211,7 @@ export default function TutorPage() {
           : 'Unable to get a tutor response right now.',
       );
     } finally {
-      setLoading(false);
+      setLoadingSend(false);
     }
   }
 
@@ -147,56 +234,78 @@ export default function TutorPage() {
 
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-6 pb-10 lg:grid-cols-[280px_1fr]">
         <aside className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
-          <h2 className="text-lg font-bold">Chat History</h2>
-          <div className="mt-3 space-y-2">
-            {loadingHistory ? (
-              <p className="text-sm text-slate-500">Loading chats...</p>
+          <button
+            type="button"
+            onClick={startNewChat}
+            className="w-full rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+          >
+            New Chat
+          </button>
+          <div className="mt-4 space-y-2">
+            {loadingSessions ? (
+              <p className="text-sm text-slate-500">Loading sessions...</p>
             ) : null}
-            {threads.length === 0 ? (
-              <p className="text-sm text-slate-500">No chats yet.</p>
+            {!loadingSessions && sessions.length === 0 ? (
+              <p className="text-sm text-slate-500">No sessions yet.</p>
             ) : null}
-            {threads.map((thread) => (
-              <button
-                key={thread.id}
-                type="button"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-slate-50 p-3 text-left text-sm"
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={`flex items-center gap-2 rounded-lg border p-2 ${
+                  activeSessionId === session.id
+                    ? 'border-[var(--color-primary)] bg-emerald-50'
+                    : 'border-[var(--color-border)] bg-slate-50'
+                }`}
               >
-                {thread.prompt}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void openSession(session.id)}
+                  className="min-w-0 flex-1 truncate text-left text-sm"
+                >
+                  {session.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSession(session.id)}
+                  disabled={deletingSessionId === session.id}
+                  className="text-xs font-semibold text-red-600 disabled:opacity-50"
+                >
+                  Del
+                </button>
+              </div>
             ))}
           </div>
         </aside>
 
         <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
           <div className="h-[68vh] space-y-5 overflow-y-auto rounded-xl bg-slate-50 p-4">
-            {loadingHistory ? (
-              <p className="text-sm text-slate-500">Loading chat history...</p>
+            {loadingMessages ? (
+              <p className="text-sm text-slate-500">Loading messages...</p>
             ) : null}
-            {threads.length === 0 ? (
+            {!loadingMessages && messages.length === 0 ? (
               <p className="text-sm text-slate-500">
-                Ask GeoLearn AI about QGIS, ArcGIS, remote sensing, or Nigerian
-                geospatial analysis.
+                Start a new conversation.
               </p>
             ) : null}
 
-            {threads.map((thread) => (
+            {messages.map((message) => (
               <article
-                key={thread.id}
+                key={message.id}
                 className="space-y-3 rounded-xl border border-[var(--color-border)] bg-white p-4"
               >
                 <div className="rounded-lg bg-[var(--color-primary)] p-3 text-sm text-white">
-                  {thread.prompt}
+                  {message.question}
                 </div>
                 <div className="text-sm leading-7 text-slate-700 whitespace-pre-wrap">
-                  {thread.response}
+                  {message.answer}
                 </div>
-                {thread.videos.length ? (
+                {message.videos.length ? (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                       Recommended Tutorials
                     </p>
                     <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      {thread.videos.map((video) => (
+                      {message.videos.map((video) => (
                         <a
                           key={video.video_url}
                           href={video.video_url}
@@ -251,7 +360,7 @@ export default function TutorPage() {
               Send
             </button>
           </div>
-          {loading ? (
+          {loadingSend ? (
             <p className="mt-2 text-xs text-slate-500">
               Generating response...
             </p>

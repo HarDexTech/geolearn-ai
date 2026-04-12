@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ChatHistory, User
+from models import ChatHistory, ChatSession, User
 
 router = APIRouter(prefix="/api", tags=["tutor"])
 
@@ -25,6 +25,7 @@ class TutorRequest(BaseModel):
     user_id: str = Field(min_length=3, max_length=255)
     email: str | None = None
     name: str | None = None
+    session_id: int | None = None
 
 
 class TutorResponse(BaseModel):
@@ -41,6 +42,38 @@ class ChatItem(BaseModel):
 
 class ChatsResponse(BaseModel):
     chats: list[ChatItem]
+
+
+class SessionCreateRequest(BaseModel):
+    user_id: str = Field(min_length=3, max_length=255)
+    title: str = Field(min_length=1, max_length=50)
+    email: str | None = None
+    name: str | None = None
+
+
+class SessionCreateResponse(BaseModel):
+    session_id: int
+    title: str
+
+
+class SessionItem(BaseModel):
+    id: int
+    title: str
+    created_at: datetime
+
+
+class SessionsResponse(BaseModel):
+    sessions: list[SessionItem]
+
+
+class SessionMessageItem(BaseModel):
+    id: int
+    question: str
+    answer: str
+
+
+class SessionMessagesResponse(BaseModel):
+    messages: list[SessionMessageItem]
 
 
 def _is_placeholder(value: str) -> bool:
@@ -149,6 +182,88 @@ def generate_answer(question: str) -> str:
     raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE)
 
 
+def _get_or_create_user(
+    db: Session,
+    clerk_user_id: str,
+    email: str | None,
+    name: str | None,
+) -> User:
+    user = db.query(User).filter(User.clerk_id == clerk_user_id).first()
+    if user is None:
+        user = User(clerk_id=clerk_user_id, email=email, name=name)
+        db.add(user)
+        db.flush()
+        return user
+
+    if email and not user.email:
+        user.email = email
+    if name and not user.name:
+        user.name = name
+    return user
+
+
+@router.post("/sessions", response_model=SessionCreateResponse)
+def create_session(payload: SessionCreateRequest, db: Session = Depends(get_db)) -> SessionCreateResponse:
+    user = _get_or_create_user(db, payload.user_id, payload.email, payload.name)
+    title = payload.title.strip()[:50]
+    if not title:
+        raise HTTPException(status_code=422, detail="Session title cannot be empty.")
+
+    session = ChatSession(user_id=user.id, title=title)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return SessionCreateResponse(session_id=session.id, title=session.title)
+
+
+@router.get("/sessions/{user_id}", response_model=SessionsResponse)
+def get_sessions(user_id: str, db: Session = Depends(get_db)) -> SessionsResponse:
+    sessions = (
+        db.query(ChatSession)
+        .join(User, User.id == ChatSession.user_id)
+        .filter(User.clerk_id == user_id)
+        .order_by(ChatSession.created_at.desc())
+        .limit(30)
+        .all()
+    )
+
+    return SessionsResponse(
+        sessions=[
+            SessionItem(id=session.id, title=session.title, created_at=session.created_at)
+            for session in sessions
+        ]
+    )
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: int, db: Session = Depends(get_db)) -> dict[str, bool]:
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    db.delete(session)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/sessions/{session_id}/messages", response_model=SessionMessagesResponse)
+def get_session_messages(session_id: int, db: Session = Depends(get_db)) -> SessionMessagesResponse:
+    messages = (
+        db.query(ChatHistory)
+        .filter(ChatHistory.session_id == session_id)
+        .order_by(ChatHistory.created_at.asc())
+        .all()
+    )
+
+    return SessionMessagesResponse(
+        messages=[
+            SessionMessageItem(id=message.id, question=message.question, answer=message.answer)
+            for message in messages
+        ]
+    )
+
+
 @router.get("/chats/{user_id}", response_model=ChatsResponse)
 def get_chats(user_id: str, db: Session = Depends(get_db)) -> ChatsResponse:
     chats = (
@@ -177,18 +292,24 @@ def get_chats(user_id: str, db: Session = Depends(get_db)) -> ChatsResponse:
 def tutor(payload: TutorRequest, db: Session = Depends(get_db)) -> TutorResponse:
     answer = generate_answer(payload.question)
 
-    user = db.query(User).filter(User.clerk_id == payload.user_id).first()
-    if user is None:
-        user = User(clerk_id=payload.user_id, email=payload.email, name=payload.name)
-        db.add(user)
-        db.flush()
-    else:
-        if payload.email and not user.email:
-            user.email = payload.email
-        if payload.name and not user.name:
-            user.name = payload.name
+    user = _get_or_create_user(db, payload.user_id, payload.email, payload.name)
 
-    chat = ChatHistory(user_id=user.id, question=payload.question, answer=answer)
+    session_id = payload.session_id
+    if session_id is not None:
+        session = (
+            db.query(ChatSession)
+            .filter(ChatSession.id == session_id, ChatSession.user_id == user.id)
+            .first()
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found for this user.")
+
+    chat = ChatHistory(
+        user_id=user.id,
+        session_id=session_id,
+        question=payload.question,
+        answer=answer,
+    )
     db.add(chat)
     db.commit()
     db.refresh(chat)

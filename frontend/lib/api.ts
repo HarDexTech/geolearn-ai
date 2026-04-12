@@ -21,6 +21,18 @@ export type ChatItem = {
   created_at: string;
 };
 
+export type SessionItem = {
+  id: number;
+  title: string;
+  created_at: string;
+};
+
+export type SessionMessage = {
+  id: number;
+  question: string;
+  answer: string;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -72,6 +84,7 @@ export async function askTutor(payload: {
   user_id: string;
   email?: string;
   name?: string;
+  session_id?: number;
 }): Promise<{ answer: string; chat_id: number }> {
   return request<{ answer: string; chat_id: number }>('/api/tutor', {
     method: 'POST',
@@ -91,5 +104,41 @@ export async function getYoutubeVideos(
 export async function getChats(userId: string): Promise<{ chats: ChatItem[] }> {
   return request<{ chats: ChatItem[] }>(
     `/api/chats/${encodeURIComponent(userId)}`,
+  );
+}
+
+export async function createSession(payload: {
+  user_id: string;
+  title: string;
+  email?: string;
+  name?: string;
+}): Promise<{ session_id: number; title: string }> {
+  return request<{ session_id: number; title: string }>('/api/sessions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSessions(
+  userId: string,
+): Promise<{ sessions: SessionItem[] }> {
+  return request<{ sessions: SessionItem[] }>(
+    `/api/sessions/${encodeURIComponent(userId)}`,
+  );
+}
+
+export async function deleteSession(
+  sessionId: number,
+): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(`/api/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getSessionMessages(
+  sessionId: number,
+): Promise<{ messages: SessionMessage[] }> {
+  return request<{ messages: SessionMessage[] }>(
+    `/api/sessions/${sessionId}/messages`,
   );
 }
