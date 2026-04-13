@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import httpx
@@ -5,7 +6,10 @@ import jwt
 from fastapi import Header, HTTPException
 from jwt import PyJWK, PyJWTError
 
-CLERK_JWKS_URL = "https://api.clerk.com/v1/jwks"
+CLERK_JWKS_URL = os.getenv(
+    "CLERK_JWKS_URL",
+    "https://api.clerk.com/v1/jwks",
+)
 
 _jwks_cache: dict[str, Any] | None = None
 
