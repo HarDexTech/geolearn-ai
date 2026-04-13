@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any
 
 import httpx
@@ -11,21 +12,48 @@ CLERK_JWKS_URL = os.getenv(
     "https://api.clerk.com/v1/jwks",
 )
 
-_jwks_cache: dict[str, Any] | None = None
+_CLERK_ISS_RE = re.compile(
+    r"^https://(?:[a-z0-9-]+\.)*[a-z0-9-]+\.clerk\.(?:accounts\.dev|com)/?$",
+    re.IGNORECASE,
+)
+
+_jwks_cache: dict[str, dict[str, Any]] = {}
 
 
 def _unauthorized(detail: str = "Invalid or missing authorization token") -> HTTPException:
     return HTTPException(status_code=401, detail=detail)
 
 
-def _get_jwks(force_refresh: bool = False) -> dict[str, Any]:
-    global _jwks_cache
-
-    if _jwks_cache is not None and not force_refresh:
-        return _jwks_cache
+def _jwks_url_for_token(token: str, prefer_env: bool = True) -> str:
+    if prefer_env and CLERK_JWKS_URL.strip():
+        return CLERK_JWKS_URL.strip()
 
     try:
-        response = httpx.get(CLERK_JWKS_URL, timeout=10.0)
+        payload = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False},
+            algorithms=["RS256"],
+        )
+    except PyJWTError as exc:
+        raise _unauthorized() from exc
+
+    issuer = payload.get("iss")
+    if not isinstance(issuer, str) or not issuer:
+        raise _unauthorized("Token issuer is missing")
+
+    normalized_issuer = issuer.rstrip("/")
+    if not _CLERK_ISS_RE.match(normalized_issuer):
+        raise _unauthorized("Token issuer is invalid")
+
+    return f"{normalized_issuer}/.well-known/jwks.json"
+
+
+def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
+    if url in _jwks_cache and not force_refresh:
+        return _jwks_cache[url]
+
+    try:
+        response = httpx.get(url, timeout=10.0)
         response.raise_for_status()
         payload = response.json()
     except Exception as exc:
@@ -35,7 +63,7 @@ def _get_jwks(force_refresh: bool = False) -> dict[str, Any]:
     if not isinstance(keys, list):
         raise _unauthorized("Invalid Clerk JWKS response")
 
-    _jwks_cache = payload
+    _jwks_cache[url] = payload
     return payload
 
 
@@ -49,11 +77,22 @@ def _get_signing_key(token: str) -> Any:
     if not isinstance(kid, str) or not kid:
         raise _unauthorized()
 
-    for refresh in (False, True):
-        jwks = _get_jwks(force_refresh=refresh)
-        for jwk in jwks.get("keys", []):
-            if jwk.get("kid") == kid:
-                return PyJWK.from_dict(jwk).key
+    primary_url = _jwks_url_for_token(token, prefer_env=True)
+    fallback_url = _jwks_url_for_token(token, prefer_env=False)
+
+    jwks_urls: list[str] = [primary_url]
+    if fallback_url != primary_url:
+        jwks_urls.append(fallback_url)
+
+    for url in jwks_urls:
+        for refresh in (False, True):
+            try:
+                jwks = _fetch_jwks(url, force_refresh=refresh)
+            except HTTPException:
+                break
+            for jwk in jwks.get("keys", []):
+                if jwk.get("kid") == kid:
+                    return PyJWK.from_dict(jwk).key
 
     raise _unauthorized()
 
