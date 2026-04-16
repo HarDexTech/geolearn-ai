@@ -251,11 +251,14 @@ def delete_session(
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
-    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    session = (
+        db.query(ChatSession)
+        .join(User, User.id == ChatSession.user_id)
+        .filter(ChatSession.id == session_id, User.clerk_id == current_user_id)
+        .first()
+    )
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found.")
-    if session.user is None or session.user.clerk_id != current_user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     db.delete(session)
     db.commit()
@@ -268,11 +271,14 @@ def get_session_messages(
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> SessionMessagesResponse:
-    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    session = (
+        db.query(ChatSession)
+        .join(User, User.id == ChatSession.user_id)
+        .filter(ChatSession.id == session_id, User.clerk_id == current_user_id)
+        .first()
+    )
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found.")
-    if session.user is None or session.user.clerk_id != current_user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     messages = (
         db.query(ChatHistory)
@@ -290,11 +296,15 @@ def get_session_messages(
 
 
 @router.get("/chats/{user_id}", response_model=ChatsResponse)
-def get_chats(user_id: str, db: Session = Depends(get_db)) -> ChatsResponse:
+def get_chats(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ChatsResponse:
     chats = (
         db.query(ChatHistory)
         .join(User, User.id == ChatHistory.user_id)
-        .filter(User.clerk_id == user_id)
+        .filter(User.clerk_id == current_user_id)
         .order_by(ChatHistory.created_at.desc())
         .limit(20)
         .all()

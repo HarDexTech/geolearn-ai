@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,8 +68,11 @@ def _ensure_session_schema() -> None:
 
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
-    _ensure_session_schema()
+    try:
+        Base.metadata.create_all(bind=engine)
+        _ensure_session_schema()
+    except Exception as exc:
+        logging.warning(f"Startup DB init failed (will retry on first request): {exc}")
 
 
 @app.get("/health")

@@ -111,10 +111,13 @@ export async function askTutor(
 
 export async function getYoutubeVideos(
   query: string,
+  token?: string,
 ): Promise<{ count: number; results: YoutubeVideo[] }> {
   const search = new URLSearchParams({ query });
   return request<{ count: number; results: YoutubeVideo[] }>(
     `/api/youtube?${search.toString()}`,
+    undefined,
+    token,
   );
 }
 

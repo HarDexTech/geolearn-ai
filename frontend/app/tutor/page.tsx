@@ -242,7 +242,7 @@ export default function TutorPage() {
       ]);
 
       try {
-        const youtube = await getYoutubeVideos(question);
+        const youtube = await getYoutubeVideos(question, token);
         setMessages((prev) =>
           prev.map((message) =>
             message.id === messageId
