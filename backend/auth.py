@@ -1,10 +1,12 @@
 import os
 import re
+import threading
+import time
 from typing import Any
 
 import httpx
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from jwt import PyJWK, PyJWTError
 
 CLERK_JWKS_URL = os.getenv(
@@ -18,6 +20,16 @@ _CLERK_ISS_RE = re.compile(
 )
 
 _jwks_cache: dict[str, dict[str, Any]] = {}
+_jwks_cache_expiry: dict[str, float] = {}
+_jwks_cache_lock = threading.Lock()
+
+_JWKS_CACHE_TTL_SECONDS = int(os.getenv("CLERK_JWKS_CACHE_TTL_SECONDS", "3600"))
+_TUTOR_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("TUTOR_RATE_LIMIT_MAX_REQUESTS", "10"))
+_TUTOR_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("TUTOR_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_TUTOR_RATE_LIMIT_MESSAGE = "Too many tutor requests. Please try again in a minute."
+
+_tutor_rate_limit_bucket: dict[str, list[float]] = {}
+_tutor_rate_limit_lock = threading.Lock()
 
 
 def _unauthorized(detail: str = "Invalid or missing authorization token") -> HTTPException:
@@ -49,8 +61,11 @@ def _jwks_url_for_token(token: str, prefer_env: bool = True) -> str:
 
 
 def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
-    if url in _jwks_cache and not force_refresh:
-        return _jwks_cache[url]
+    now = time.time()
+
+    with _jwks_cache_lock:
+        if not force_refresh and url in _jwks_cache and _jwks_cache_expiry.get(url, 0) > now:
+            return _jwks_cache[url]
 
     try:
         response = httpx.get(url, timeout=10.0)
@@ -63,7 +78,11 @@ def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
     if not isinstance(keys, list):
         raise _unauthorized("Invalid Clerk JWKS response")
 
-    _jwks_cache[url] = payload
+    ttl_seconds = max(_JWKS_CACHE_TTL_SECONDS, 1)
+    with _jwks_cache_lock:
+        _jwks_cache[url] = payload
+        _jwks_cache_expiry[url] = now + ttl_seconds
+
     return payload
 
 
@@ -122,3 +141,21 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
         raise _unauthorized("Token subject is missing")
 
     return subject
+
+
+def get_tutor_user_id_with_rate_limit(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    now = time.time()
+    window_start = now - _TUTOR_RATE_LIMIT_WINDOW_SECONDS
+
+    with _tutor_rate_limit_lock:
+        timestamps = _tutor_rate_limit_bucket.setdefault(current_user_id, [])
+        timestamps[:] = [timestamp for timestamp in timestamps if timestamp >= window_start]
+
+        if len(timestamps) >= _TUTOR_RATE_LIMIT_MAX_REQUESTS:
+            raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
+
+        timestamps.append(now)
+
+    return current_user_id

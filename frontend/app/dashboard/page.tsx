@@ -1,22 +1,23 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useUser, UserButton } from '@clerk/nextjs';
-import { askTutor, getYoutubeVideos, YoutubeVideo } from '@/lib/api';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useAuth, useUser, UserButton } from "@clerk/nextjs";
+import { askTutor, getYoutubeVideos, YoutubeVideo } from "@/lib/api";
 
 type Message = {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   videos?: YoutubeVideo[];
 };
 
 export default function DashboardPage() {
+  const { getToken } = useAuth();
   const { user } = useUser();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [question, setQuestion] = useState('');
+  const [question, setQuestion] = useState("");
   const [loadingTutor, setLoadingTutor] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,20 +27,28 @@ export default function DashboardPage() {
     [question, loadingTutor],
   );
 
+  async function getAuthTokenOrThrow() {
+    const token = await getToken();
+    if (!token) {
+      throw new Error("Unable to authenticate request. Please sign in again.");
+    }
+    return token;
+  }
+
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (
-        !target.closest('[data-mobile-nav]') &&
-        !target.closest('[data-mobile-nav-toggle]')
+        !target.closest("[data-mobile-nav]") &&
+        !target.closest("[data-mobile-nav-toggle]")
       ) {
         setMobileNavOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleDocumentMouseDown);
+    document.addEventListener("mousedown", handleDocumentMouseDown);
     return () => {
-      document.removeEventListener('mousedown', handleDocumentMouseDown);
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
     };
   }, []);
 
@@ -48,37 +57,47 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!user?.id) {
+      setError("Please sign in to use the tutor.");
+      return;
+    }
+
     const prompt = question.trim();
     const userMessage: Message = {
       id: crypto.randomUUID(),
-      role: 'user',
+      role: "user",
       content: prompt,
     };
 
-    setQuestion('');
+    setQuestion("");
     setError(null);
     setLoadingTutor(true);
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const tutor = await askTutor({
-        question: prompt,
-        user_id: user?.id ?? 'user_demo',
-        email: user?.primaryEmailAddress?.emailAddress,
-        name: user?.fullName ?? undefined,
-      });
+      const token = await getAuthTokenOrThrow();
+
+      const tutor = await askTutor(
+        {
+          question: prompt,
+          user_id: user.id,
+          email: user?.primaryEmailAddress?.emailAddress,
+          name: user?.fullName ?? undefined,
+        },
+        token,
+      );
 
       const assistantMessageId = crypto.randomUUID();
       const assistantMessage: Message = {
         id: assistantMessageId,
-        role: 'assistant',
+        role: "assistant",
         content: tutor.answer,
         videos: [],
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
       try {
-        const youtube = await getYoutubeVideos(prompt);
+        const youtube = await getYoutubeVideos(prompt, token);
         setMessages((prev) =>
           prev.map((message) =>
             message.id === assistantMessageId
@@ -91,7 +110,7 @@ export default function DashboardPage() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to get tutor response.',
+        err instanceof Error ? err.message : "Failed to get tutor response.",
       );
     } finally {
       setLoadingTutor(false);
@@ -192,20 +211,20 @@ export default function DashboardPage() {
               <div
                 key={message.id}
                 className={
-                  message.role === 'user' ? 'ml-auto w-[85%]' : 'w-[92%]'
+                  message.role === "user" ? "ml-auto w-[85%]" : "w-[92%]"
                 }
               >
                 <div
                   className={`rounded-xl p-4 text-sm leading-7 ${
-                    message.role === 'user'
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'border border-[var(--color-border)] bg-white'
+                    message.role === "user"
+                      ? "bg-[var(--color-primary)] text-white"
+                      : "border border-[var(--color-border)] bg-white"
                   }`}
                 >
                   {message.content}
                 </div>
 
-                {message.role === 'assistant' && message.videos?.length ? (
+                {message.role === "assistant" && message.videos?.length ? (
                   <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-white p-3">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                       Recommended Tutorials
@@ -250,7 +269,7 @@ export default function DashboardPage() {
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
+                if (event.key === "Enter") {
                   void handleAsk();
                 }
               }}

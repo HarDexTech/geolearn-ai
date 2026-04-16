@@ -8,7 +8,7 @@ from groq import Groq
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth import get_current_user_id
+from auth import get_current_user_id, get_tutor_user_id_with_rate_limit
 from database import get_db
 from models import ChatHistory, ChatSession, User
 
@@ -323,10 +323,14 @@ def get_chats(
     )
 
 
-@router.post("/tutor", response_model=TutorResponse)
+@router.post(
+    "/tutor",
+    response_model=TutorResponse,
+    responses={429: {"description": "Too many tutor requests"}},
+)
 def tutor(
     payload: TutorRequest,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> TutorResponse:
     answer = generate_answer(payload.question)
