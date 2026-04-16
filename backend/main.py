@@ -11,8 +11,13 @@ from routers import datasets, tutor, youtube
 app = FastAPI(title="GeoLearn AI API")
 
 frontend_origin = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "http://localhost:3000")
-# NOTE: Tighten this allowlist for production deployments.
-allow_origins = list(dict.fromkeys([frontend_origin, "http://127.0.0.1:3000"]))
+environment = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")).lower()
+
+allow_origins = [frontend_origin]
+if environment != "production":
+    allow_origins.append("http://127.0.0.1:3000")
+
+allow_origins = list(dict.fromkeys(allow_origins))
 
 app.add_middleware(
     CORSMiddleware,

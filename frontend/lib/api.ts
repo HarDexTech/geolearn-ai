@@ -33,7 +33,7 @@ export type SessionMessage = {
   answer: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
 
 async function request<T>(
   path: string,
@@ -41,7 +41,7 @@ async function request<T>(
   token?: string,
 ): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(init?.headers as Record<string, string> | undefined),
   };
 
@@ -52,7 +52,7 @@ async function request<T>(
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers,
-    cache: 'no-store',
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -77,13 +77,13 @@ export async function getDatasets(params?: {
 }): Promise<{ count: number; datasets: Dataset[] }> {
   const search = new URLSearchParams();
   if (params?.query) {
-    search.set('query', params.query);
+    search.set("query", params.query);
   }
-  if (params?.category && params.category !== 'all') {
-    search.set('category', params.category);
+  if (params?.category && params.category !== "all") {
+    search.set("category", params.category);
   }
 
-  const suffix = search.toString() ? `?${search.toString()}` : '';
+  const suffix = search.toString() ? `?${search.toString()}` : "";
   return request<{ count: number; datasets: Dataset[] }>(
     `/api/datasets${suffix}`,
   );
@@ -92,7 +92,6 @@ export async function getDatasets(params?: {
 export async function askTutor(
   payload: {
     question: string;
-    user_id: string;
     email?: string;
     name?: string;
     session_id?: number;
@@ -100,9 +99,9 @@ export async function askTutor(
   token?: string,
 ): Promise<{ answer: string; chat_id: number }> {
   return request<{ answer: string; chat_id: number }>(
-    '/api/tutor',
+    "/api/tutor",
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     },
     token,
@@ -121,15 +120,12 @@ export async function getYoutubeVideos(
   );
 }
 
-export async function getChats(userId: string): Promise<{ chats: ChatItem[] }> {
-  return request<{ chats: ChatItem[] }>(
-    `/api/chats/${encodeURIComponent(userId)}`,
-  );
+export async function getChats(token?: string): Promise<{ chats: ChatItem[] }> {
+  return request<{ chats: ChatItem[] }>("/api/chats", undefined, token);
 }
 
 export async function createSession(
   payload: {
-    user_id: string;
     title: string;
     email?: string;
     name?: string;
@@ -137,9 +133,9 @@ export async function createSession(
   token?: string,
 ): Promise<{ session_id: number; title: string }> {
   return request<{ session_id: number; title: string }>(
-    '/api/sessions',
+    "/api/sessions",
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     },
     token,
@@ -147,11 +143,10 @@ export async function createSession(
 }
 
 export async function getSessions(
-  userId: string,
   token?: string,
 ): Promise<{ sessions: SessionItem[] }> {
   return request<{ sessions: SessionItem[] }>(
-    `/api/sessions/${encodeURIComponent(userId)}`,
+    "/api/sessions",
     undefined,
     token,
   );
@@ -164,7 +159,7 @@ export async function deleteSession(
   return request<{ deleted: boolean }>(
     `/api/sessions/${sessionId}`,
     {
-      method: 'DELETE',
+      method: "DELETE",
     },
     token,
   );

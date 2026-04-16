@@ -23,7 +23,7 @@ _jwks_cache: dict[str, dict[str, Any]] = {}
 _jwks_cache_expiry: dict[str, float] = {}
 _jwks_cache_lock = threading.Lock()
 
-_JWKS_CACHE_TTL_SECONDS = int(os.getenv("CLERK_JWKS_CACHE_TTL_SECONDS", "3600"))
+_JWKS_CACHE_TTL_SECONDS = int(os.getenv("CLERK_JWKS_CACHE_TTL_SECONDS", "900"))
 _TUTOR_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("TUTOR_RATE_LIMIT_MAX_REQUESTS", "10"))
 _TUTOR_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("TUTOR_RATE_LIMIT_WINDOW_SECONDS", "60"))
 _TUTOR_RATE_LIMIT_MESSAGE = "Too many tutor requests. Please try again in a minute."

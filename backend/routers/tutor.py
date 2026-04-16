@@ -2,7 +2,6 @@ import os
 import re
 from datetime import datetime
 
-from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from groq import Groq
 from pydantic import BaseModel, Field
@@ -23,7 +22,6 @@ UNAVAILABLE_MESSAGE = "All AI providers are currently unavailable. Please try ag
 
 class TutorRequest(BaseModel):
     question: str = Field(min_length=3, max_length=4000)
-    user_id: str = Field(min_length=3, max_length=255)
     email: str | None = None
     name: str | None = None
     session_id: int | None = None
@@ -46,7 +44,6 @@ class ChatsResponse(BaseModel):
 
 
 class SessionCreateRequest(BaseModel):
-    user_id: str = Field(min_length=3, max_length=255)
     title: str = Field(min_length=1, max_length=50)
     email: str | None = None
     name: str | None = None
@@ -166,9 +163,6 @@ def _call_gemini(question: str, api_key: str) -> str:
 
 
 def generate_answer(question: str) -> str:
-    # Load latest env values at request time so newly added keys are picked up automatically.
-    load_dotenv(override=True)
-
     providers: list[tuple[str, str]] = [("groq", key) for key in _scan_provider_keys("GROQ_API_KEY")]
     providers.extend(("gemini", key) for key in _scan_provider_keys("GEMINI_API_KEY"))
 
@@ -210,7 +204,7 @@ def create_session(
     db: Session = Depends(get_db),
 ) -> SessionCreateResponse:
     user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
-    title = payload.title.strip()[:50]
+    title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=422, detail="Session title cannot be empty.")
 
@@ -222,9 +216,8 @@ def create_session(
     return SessionCreateResponse(session_id=session.id, title=session.title)
 
 
-@router.get("/sessions/{user_id}", response_model=SessionsResponse)
+@router.get("/sessions", response_model=SessionsResponse)
 def get_sessions(
-    user_id: str,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> SessionsResponse:
@@ -295,9 +288,8 @@ def get_session_messages(
     )
 
 
-@router.get("/chats/{user_id}", response_model=ChatsResponse)
+@router.get("/chats", response_model=ChatsResponse)
 def get_chats(
-    user_id: str,
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> ChatsResponse:

@@ -80,7 +80,6 @@ export default function DashboardPage() {
       const tutor = await askTutor(
         {
           question: prompt,
-          user_id: user.id,
           email: user?.primaryEmailAddress?.emailAddress,
           name: user?.fullName ?? undefined,
         },

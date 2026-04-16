@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useAuth, useUser, UserButton } from '@clerk/nextjs';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useAuth, useUser, UserButton } from "@clerk/nextjs";
 import {
   askTutor,
   createSession,
@@ -13,7 +13,7 @@ import {
   getYoutubeVideos,
   SessionItem,
   YoutubeVideo,
-} from '@/lib/api';
+} from "@/lib/api";
 
 type Message = {
   id: string;
@@ -28,7 +28,7 @@ export default function TutorPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [loadingSend, setLoadingSend] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -48,7 +48,7 @@ export default function TutorPage() {
   async function getAuthTokenOrThrow() {
     const token = await getToken();
     if (!token) {
-      throw new Error('Unable to authenticate request. Please sign in again.');
+      throw new Error("Unable to authenticate request. Please sign in again.");
     }
     return token;
   }
@@ -64,7 +64,7 @@ export default function TutorPage() {
       setLoadingSessions(true);
       try {
         const token = await getAuthTokenOrThrow();
-        const result = await getSessions(user.id, token);
+        const result = await getSessions(token);
         if (!active) {
           return;
         }
@@ -79,7 +79,7 @@ export default function TutorPage() {
         setError(
           err instanceof Error
             ? err.message
-            : 'Unable to load sessions right now.',
+            : "Unable to load sessions right now.",
         );
       } finally {
         if (active) {
@@ -99,21 +99,21 @@ export default function TutorPage() {
     const handleDocumentMouseDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
 
-      if (!target.closest('[data-session-menu]')) {
+      if (!target.closest("[data-session-menu]")) {
         setOpenMenuId(null);
       }
 
       if (
-        !target.closest('[data-mobile-nav]') &&
-        !target.closest('[data-mobile-nav-toggle]')
+        !target.closest("[data-mobile-nav]") &&
+        !target.closest("[data-mobile-nav-toggle]")
       ) {
         setMobileNavOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleDocumentMouseDown);
+    document.addEventListener("mousedown", handleDocumentMouseDown);
     return () => {
-      document.removeEventListener('mousedown', handleDocumentMouseDown);
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
     };
   }, []);
 
@@ -139,7 +139,7 @@ export default function TutorPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to load messages for this session.',
+          : "Unable to load messages for this session.",
       );
       setMessages([]);
     } finally {
@@ -150,7 +150,7 @@ export default function TutorPage() {
   function startNewChat() {
     setActiveSessionId(null);
     setMessages([]);
-    setPrompt('');
+    setPrompt("");
     setError(null);
     setOpenMenuId(null);
     setSidebarOpen(false);
@@ -173,7 +173,7 @@ export default function TutorPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to delete session right now.',
+          : "Unable to delete session right now.",
       );
     } finally {
       setDeletingSessionId(null);
@@ -186,7 +186,7 @@ export default function TutorPage() {
     }
 
     const question = prompt.trim();
-    setPrompt('');
+    setPrompt("");
     setLoadingSend(true);
     setError(null);
 
@@ -198,7 +198,6 @@ export default function TutorPage() {
         const title = question.slice(0, 50);
         const created = await createSession(
           {
-            user_id: user.id,
             title,
             email: user.primaryEmailAddress?.emailAddress,
             name: user.fullName ?? undefined,
@@ -222,7 +221,6 @@ export default function TutorPage() {
       const tutor = await askTutor(
         {
           question,
-          user_id: user.id,
           email: user.primaryEmailAddress?.emailAddress,
           name: user.fullName ?? undefined,
           session_id: sessionId,
@@ -257,7 +255,7 @@ export default function TutorPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to get a tutor response right now.',
+          : "Unable to get a tutor response right now.",
       );
     } finally {
       setLoadingSend(false);
@@ -353,7 +351,7 @@ export default function TutorPage() {
 
         <aside
           className={`fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto border-r border-[var(--color-border)] bg-white p-4 transition-transform duration-300 lg:static lg:w-auto lg:rounded-2xl lg:border lg:translate-x-0 ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           <button
@@ -376,8 +374,8 @@ export default function TutorPage() {
                 data-session-menu
                 className={`flex items-center gap-2 rounded-lg border p-2 ${
                   activeSessionId === session.id
-                    ? 'border-[var(--color-primary)] bg-emerald-50'
-                    : 'border-[var(--color-border)] bg-slate-50'
+                    ? "border-[var(--color-primary)] bg-emerald-50"
+                    : "border-[var(--color-border)] bg-slate-50"
                 }`}
               >
                 <button
@@ -485,7 +483,7 @@ export default function TutorPage() {
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
+                if (event.key === "Enter") {
                   void handleSend();
                 }
               }}

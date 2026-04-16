@@ -36,11 +36,18 @@ async def youtube(
     except httpx.TimeoutException as exc:
         raise HTTPException(status_code=504, detail="YouTube API request timed out.") from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"YouTube API request failed: {exc}") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch videos from YouTube right now.",
+        ) from exc
 
     if response.status_code != 200:
-        detail = response.json().get("error", {}).get("message", "Unknown YouTube API error")
         status = 429 if response.status_code == 403 else 502
+        detail = (
+            "YouTube quota limit reached. Please try again later."
+            if status == 429
+            else "Unable to fetch videos from YouTube right now."
+        )
         raise HTTPException(status_code=status, detail=detail)
 
     payload = response.json()
