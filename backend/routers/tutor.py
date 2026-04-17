@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from auth import get_current_user_id, get_tutor_user_id_with_rate_limit
-from database import get_db
+from database import SessionLocal, get_db
 from models import ChatHistory, ChatSession, User
 
 router = APIRouter(prefix="/api", tags=["tutor"])
@@ -483,6 +483,8 @@ def tutor_stream(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
+    db.commit()
+    db.refresh(user)
 
     session_id = payload.session_id
     if session_id is not None:
@@ -511,17 +513,19 @@ def tutor_stream(
                 yield _event({"type": "error", "message": UNAVAILABLE_MESSAGE})
                 return
 
-            chat = ChatHistory(
-                user_id=user.id,
-                session_id=session_id,
-                question=payload.question,
-                answer=final_answer,
-            )
-            db.add(chat)
-            db.commit()
-            db.refresh(chat)
+            with SessionLocal() as stream_db:
+                chat = ChatHistory(
+                    user_id=user.id,
+                    session_id=session_id,
+                    question=payload.question,
+                    answer=final_answer,
+                )
+                stream_db.add(chat)
+                stream_db.commit()
+                stream_db.refresh(chat)
+                chat_id = chat.id
 
-            yield _event({"type": "done", "chat_id": chat.id})
+            yield _event({"type": "done", "chat_id": chat_id})
         except HTTPException as exc:
             yield _event({"type": "error", "message": str(exc.detail)})
         except Exception:

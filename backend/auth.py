@@ -39,6 +39,7 @@ _TUTOR_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("TUTOR_RATE_LIMIT_WINDOW_SECOND
 _TUTOR_RATE_LIMIT_MESSAGE = "Too many tutor requests. Please try again in a minute."
 _REDIS_URL = os.getenv("REDIS_URL", "").strip()
 _REDIS_TUTOR_RATE_LIMIT_PREFIX = os.getenv("REDIS_TUTOR_RATE_LIMIT_PREFIX", "ratelimit:tutor")
+_REDIS_UNAVAILABLE_MESSAGE = "Rate limiter backend unavailable. Please try again shortly."
 
 _tutor_rate_limit_bucket: dict[str, list[float]] = {}
 _tutor_rate_limit_lock = threading.Lock()
@@ -95,10 +96,10 @@ def _get_redis_client() -> Any:
     return _redis_client
 
 
-def _is_tutor_rate_limited_with_redis(current_user_id: str) -> bool:
+def _enforce_tutor_rate_limit_with_redis(current_user_id: str) -> None:
     client = _get_redis_client()
     if client is None:
-        return False
+        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
 
     window_seconds = max(_TUTOR_RATE_LIMIT_WINDOW_SECONDS, 1)
     max_requests = max(_TUTOR_RATE_LIMIT_MAX_REQUESTS, 1)
@@ -107,9 +108,10 @@ def _is_tutor_rate_limited_with_redis(current_user_id: str) -> bool:
     try:
         current_count = int(client.eval(_REDIS_RATE_LIMIT_LUA, 1, key, window_seconds))
     except Exception:
-        return False
+        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
 
-    return current_count >= max_requests
+    if current_count > max_requests:
+        raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
 
 
 def _jwks_url_for_token(token: str, prefer_env: bool = True) -> str:
@@ -237,8 +239,10 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
 def get_tutor_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
-    if _is_tutor_rate_limited_with_redis(current_user_id):
-        raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
+    # If Redis is configured, enforce limits through the shared backend only.
+    if _REDIS_URL:
+        _enforce_tutor_rate_limit_with_redis(current_user_id)
+        return current_user_id
 
     now = time.time()
     window_start = now - _TUTOR_RATE_LIMIT_WINDOW_SECONDS
