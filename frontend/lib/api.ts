@@ -33,6 +33,11 @@ export type SessionMessage = {
   answer: string;
 };
 
+export type TutorStreamEvent =
+  | { type: "chunk"; text: string }
+  | { type: "done"; chat_id: number }
+  | { type: "error"; message: string };
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
 
 async function request<T>(
@@ -106,6 +111,89 @@ export async function askTutor(
     },
     token,
   );
+}
+
+export async function askTutorStream(
+  payload: {
+    question: string;
+    email?: string;
+    name?: string;
+    session_id?: number;
+  },
+  token: string,
+  onEvent: (event: TutorStreamEvent) => void,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/tutor/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Request failed with status ${response.status}`;
+    try {
+      const data = (await response.json()) as { detail?: string };
+      if (data.detail) {
+        errorMessage = data.detail;
+      }
+    } catch {
+      // Ignore JSON parsing errors and use the generic fallback.
+    }
+    throw new Error(errorMessage);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming is not supported by this browser.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const processEventBlock = (block: string) => {
+    const dataLines = block
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart());
+
+    if (!dataLines.length) {
+      return;
+    }
+
+    const payloadText = dataLines.join("\n");
+    const event = JSON.parse(payloadText) as TutorStreamEvent;
+    onEvent(event);
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundaryIndex = buffer.indexOf("\n\n");
+    while (boundaryIndex !== -1) {
+      const block = buffer.slice(0, boundaryIndex).trim();
+      buffer = buffer.slice(boundaryIndex + 2);
+
+      if (block) {
+        processEventBlock(block);
+      }
+
+      boundaryIndex = buffer.indexOf("\n\n");
+    }
+  }
+
+  const trailing = buffer.trim();
+  if (trailing) {
+    processEventBlock(trailing);
+  }
 }
 
 export async function getYoutubeVideos(

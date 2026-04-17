@@ -1,8 +1,11 @@
 import os
 import re
+import json
 from datetime import datetime
+from typing import Generator
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from groq import Groq
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -74,6 +77,59 @@ class SessionMessagesResponse(BaseModel):
     messages: list[SessionMessageItem]
 
 
+def _provider_keys() -> list[tuple[str, str]]:
+    providers: list[tuple[str, str]] = [("groq", key) for key in _scan_provider_keys("GROQ_API_KEY")]
+    providers.extend(("gemini", key) for key in _scan_provider_keys("GEMINI_API_KEY"))
+    return providers
+
+
+def _build_messages(question: str, history: list[tuple[str, str]]) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for prev_question, prev_answer in history:
+        messages.append({"role": "user", "content": prev_question})
+        messages.append({"role": "assistant", "content": prev_answer})
+
+    messages.append({"role": "user", "content": question})
+    return messages
+
+
+def _build_gemini_prompt(question: str, history: list[tuple[str, str]]) -> str:
+    if not history:
+        return question
+
+    transcript_lines = []
+    for prev_question, prev_answer in history:
+        transcript_lines.append(f"User: {prev_question}")
+        transcript_lines.append(f"Assistant: {prev_answer}")
+
+    transcript = "\n".join(transcript_lines)
+    return (
+        "Use the prior conversation context to answer the latest user question.\n\n"
+        f"Conversation history:\n{transcript}\n\n"
+        f"Latest user question:\n{question}"
+    )
+
+
+def _load_session_context(
+    db: Session,
+    user_id: int,
+    session_id: int | None,
+    max_turns: int = 6,
+) -> list[tuple[str, str]]:
+    if session_id is None:
+        return []
+
+    rows = (
+        db.query(ChatHistory.question, ChatHistory.answer)
+        .filter(ChatHistory.user_id == user_id, ChatHistory.session_id == session_id)
+        .order_by(ChatHistory.created_at.desc())
+        .limit(max_turns)
+        .all()
+    )
+
+    return list(reversed([(row.question, row.answer) for row in rows]))
+
+
 def _is_placeholder(value: str) -> bool:
     normalized = value.strip().lower()
     if not normalized:
@@ -117,14 +173,11 @@ def _scan_provider_keys(prefix: str) -> list[str]:
     return [value for _, value in indexed]
 
 
-def _call_groq(question: str, api_key: str) -> str:
+def _call_groq(question: str, api_key: str, history: list[tuple[str, str]]) -> str:
     client = Groq(api_key=api_key)
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": question},
-        ],
+        messages=_build_messages(question, history),
         temperature=0.2,
     )
 
@@ -134,7 +187,7 @@ def _call_groq(question: str, api_key: str) -> str:
     return content.strip()
 
 
-def _call_gemini(question: str, api_key: str) -> str:
+def _call_gemini(question: str, api_key: str, history: list[tuple[str, str]]) -> str:
     try:
         import google.generativeai as genai
     except ImportError as exc:
@@ -146,7 +199,7 @@ def _call_gemini(question: str, api_key: str) -> str:
         system_instruction=SYSTEM_PROMPT,
     )
 
-    response = model.generate_content(question)
+    response = model.generate_content(_build_gemini_prompt(question, history))
     text = getattr(response, "text", None)
     if text and text.strip():
         return text.strip()
@@ -162,16 +215,83 @@ def _call_gemini(question: str, api_key: str) -> str:
     raise RuntimeError("Gemini returned an empty response.")
 
 
-def generate_answer(question: str) -> str:
-    providers: list[tuple[str, str]] = [("groq", key) for key in _scan_provider_keys("GROQ_API_KEY")]
-    providers.extend(("gemini", key) for key in _scan_provider_keys("GEMINI_API_KEY"))
+def _stream_groq(
+    question: str,
+    api_key: str,
+    history: list[tuple[str, str]],
+) -> Generator[str, None, None]:
+    client = Groq(api_key=api_key)
+    stream = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=_build_messages(question, history),
+        temperature=0.2,
+        stream=True,
+    )
+
+    for chunk in stream:
+        piece = chunk.choices[0].delta.content if chunk.choices else None
+        if piece:
+            yield piece
+
+
+def _stream_gemini(
+    question: str,
+    api_key: str,
+    history: list[tuple[str, str]],
+) -> Generator[str, None, None]:
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:
+        raise RuntimeError("google-generativeai is not installed.") from exc
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=SYSTEM_PROMPT,
+    )
+
+    stream = model.generate_content(_build_gemini_prompt(question, history), stream=True)
+    for chunk in stream:
+        text = getattr(chunk, "text", None)
+        if text:
+            yield text
+
+
+def generate_answer(question: str, history: list[tuple[str, str]]) -> str:
+    providers = _provider_keys()
 
     for provider, key in providers:
         try:
             if provider == "groq":
-                return _call_groq(question, key)
-            return _call_gemini(question, key)
+                return _call_groq(question, key, history)
+            return _call_gemini(question, key, history)
         except Exception:
+            continue
+
+    raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE)
+
+
+def _stream_answer(question: str, history: list[tuple[str, str]]) -> Generator[str, None, str]:
+    providers = _provider_keys()
+    answer_parts: list[str] = []
+
+    for provider, key in providers:
+        try:
+            generator = (
+                _stream_groq(question, key, history)
+                if provider == "groq"
+                else _stream_gemini(question, key, history)
+            )
+            for piece in generator:
+                answer_parts.append(piece)
+                yield piece
+
+            full_answer = "".join(answer_parts).strip()
+            if full_answer:
+                return full_answer
+            answer_parts.clear()
+        except Exception:
+            answer_parts.clear()
             continue
 
     raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE)
@@ -325,8 +445,6 @@ def tutor(
     current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> TutorResponse:
-    answer = generate_answer(payload.question)
-
     user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
 
     session_id = payload.session_id
@@ -339,6 +457,9 @@ def tutor(
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found for this user.")
 
+    context_history = _load_session_context(db, user.id, session_id)
+    answer = generate_answer(payload.question, context_history)
+
     chat = ChatHistory(
         user_id=user.id,
         session_id=session_id,
@@ -350,3 +471,68 @@ def tutor(
     db.refresh(chat)
 
     return TutorResponse(answer=chat.answer, chat_id=chat.id)
+
+
+@router.post(
+    "/tutor/stream",
+    responses={429: {"description": "Too many tutor requests"}},
+)
+def tutor_stream(
+    payload: TutorRequest,
+    current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
+
+    session_id = payload.session_id
+    if session_id is not None:
+        session = (
+            db.query(ChatSession)
+            .filter(ChatSession.id == session_id, ChatSession.user_id == user.id)
+            .first()
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found for this user.")
+
+    context_history = _load_session_context(db, user.id, session_id)
+
+    def _event(data: dict[str, object]) -> str:
+        return f"data: {json.dumps(data)}\n\n"
+
+    def _event_stream() -> Generator[str, None, None]:
+        try:
+            answer = ""
+            for piece in _stream_answer(payload.question, context_history):
+                answer += piece
+                yield _event({"type": "chunk", "text": piece})
+
+            final_answer = answer.strip()
+            if not final_answer:
+                yield _event({"type": "error", "message": UNAVAILABLE_MESSAGE})
+                return
+
+            chat = ChatHistory(
+                user_id=user.id,
+                session_id=session_id,
+                question=payload.question,
+                answer=final_answer,
+            )
+            db.add(chat)
+            db.commit()
+            db.refresh(chat)
+
+            yield _event({"type": "done", "chat_id": chat.id})
+        except HTTPException as exc:
+            yield _event({"type": "error", "message": str(exc.detail)})
+        except Exception:
+            yield _event({"type": "error", "message": UNAVAILABLE_MESSAGE})
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

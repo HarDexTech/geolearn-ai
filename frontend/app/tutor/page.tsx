@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth, useUser, UserButton } from "@clerk/nextjs";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import {
-  askTutor,
+  askTutorStream,
   createSession,
   deleteSession,
   getSessionMessages,
@@ -45,13 +48,13 @@ export default function TutorPage() {
     [prompt, loadingSend],
   );
 
-  async function getAuthTokenOrThrow() {
+  const getAuthTokenOrThrow = useCallback(async () => {
     const token = await getToken();
     if (!token) {
       throw new Error("Unable to authenticate request. Please sign in again.");
     }
     return token;
-  }
+  }, [getToken]);
 
   useEffect(() => {
     if (!isLoaded || !user?.id) {
@@ -93,7 +96,7 @@ export default function TutorPage() {
     return () => {
       active = false;
     };
-  }, [isLoaded, user?.id]);
+  }, [getAuthTokenOrThrow, isLoaded, user?.id]);
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -218,7 +221,20 @@ export default function TutorPage() {
         ]);
       }
 
-      const tutor = await askTutor(
+      const tempMessageId = `temp-${crypto.randomUUID()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: tempMessageId,
+          question,
+          answer: "",
+          videos: [],
+        },
+      ]);
+
+      let finalMessageId = tempMessageId;
+
+      await askTutorStream(
         {
           question,
           email: user.primaryEmailAddress?.emailAddress,
@@ -226,24 +242,40 @@ export default function TutorPage() {
           session_id: sessionId,
         },
         token,
-      );
+        (event) => {
+          if (event.type === "chunk") {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === finalMessageId
+                  ? { ...message, answer: `${message.answer}${event.text}` }
+                  : message,
+              ),
+            );
+            return;
+          }
 
-      const messageId = String(tutor.chat_id);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messageId,
-          question,
-          answer: tutor.answer,
-          videos: [],
+          if (event.type === "done") {
+            const persistentId = String(event.chat_id);
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === finalMessageId
+                  ? { ...message, id: persistentId }
+                  : message,
+              ),
+            );
+            finalMessageId = persistentId;
+            return;
+          }
+
+          throw new Error(event.message);
         },
-      ]);
+      );
 
       try {
         const youtube = await getYoutubeVideos(question, token);
         setMessages((prev) =>
           prev.map((message) =>
-            message.id === messageId
+            message.id === finalMessageId
               ? { ...message, videos: youtube.results }
               : message,
           ),
@@ -435,8 +467,13 @@ export default function TutorPage() {
                 <div className="rounded-lg bg-[var(--color-primary)] p-3 text-sm text-white">
                   {message.question}
                 </div>
-                <div className="text-sm leading-7 text-slate-700 whitespace-pre-wrap">
-                  {message.answer}
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-700 prose-p:my-2 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeSanitize]}
+                  >
+                    {message.answer}
+                  </ReactMarkdown>
                 </div>
                 {message.videos.length ? (
                   <div>

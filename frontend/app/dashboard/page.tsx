@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth, useUser, UserButton } from "@clerk/nextjs";
-import { askTutor, getYoutubeVideos, YoutubeVideo } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
+import { askTutorStream, getYoutubeVideos, YoutubeVideo } from "@/lib/api";
 
 type Message = {
   id: string;
@@ -77,29 +80,58 @@ export default function DashboardPage() {
     try {
       const token = await getAuthTokenOrThrow();
 
-      const tutor = await askTutor(
+      const assistantMessageId = `temp-${crypto.randomUUID()}`;
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        videos: [],
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      let finalMessageId = assistantMessageId;
+
+      await askTutorStream(
         {
           question: prompt,
           email: user?.primaryEmailAddress?.emailAddress,
           name: user?.fullName ?? undefined,
         },
         token,
-      );
+        (event) => {
+          if (event.type === "chunk") {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === finalMessageId
+                  ? { ...message, content: `${message.content}${event.text}` }
+                  : message,
+              ),
+            );
+            return;
+          }
 
-      const assistantMessageId = crypto.randomUUID();
-      const assistantMessage: Message = {
-        id: assistantMessageId,
-        role: "assistant",
-        content: tutor.answer,
-        videos: [],
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+          if (event.type === "done") {
+            const persistentId = String(event.chat_id);
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === finalMessageId
+                  ? { ...message, id: persistentId }
+                  : message,
+              ),
+            );
+            finalMessageId = persistentId;
+            return;
+          }
+
+          throw new Error(event.message);
+        },
+      );
 
       try {
         const youtube = await getYoutubeVideos(prompt, token);
         setMessages((prev) =>
           prev.map((message) =>
-            message.id === assistantMessageId
+            message.id === finalMessageId
               ? { ...message, videos: youtube.results }
               : message,
           ),
@@ -220,7 +252,18 @@ export default function DashboardPage() {
                       : "border border-[var(--color-border)] bg-white"
                   }`}
                 >
-                  {message.content}
+                  {message.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none text-slate-700 prose-p:my-2 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeSanitize]}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    message.content
+                  )}
                 </div>
 
                 {message.role === "assistant" && message.videos?.length ? (
