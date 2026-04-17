@@ -4,7 +4,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from auth import get_current_user_id
+from auth import get_youtube_user_id_with_rate_limit
 
 load_dotenv()
 
@@ -16,11 +16,11 @@ YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 @router.get("/youtube")
 async def youtube(
     query: str = Query(min_length=2, max_length=120),
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_youtube_user_id_with_rate_limit),
 ) -> dict[str, object]:
     api_key = os.getenv("YOUTUBE_API_KEY")
     if not api_key or api_key == "your_youtube_api_key_here":
-        raise HTTPException(status_code=500, detail="YOUTUBE_API_KEY is not configured.")
+        raise HTTPException(status_code=503, detail="Video service unavailable.")
 
     params = {
         "part": "snippet",

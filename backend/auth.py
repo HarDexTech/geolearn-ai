@@ -38,12 +38,24 @@ _JWKS_STALE_WHILE_REVALIDATE_SECONDS = int(
 _TUTOR_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("TUTOR_RATE_LIMIT_MAX_REQUESTS", "10"))
 _TUTOR_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("TUTOR_RATE_LIMIT_WINDOW_SECONDS", "60"))
 _TUTOR_RATE_LIMIT_MESSAGE = "Too many tutor requests. Please try again in a minute."
+_SESSIONS_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("SESSIONS_RATE_LIMIT_MAX_REQUESTS", "60"))
+_SESSIONS_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SESSIONS_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_SESSIONS_RATE_LIMIT_MESSAGE = "Too many session requests. Please try again in a minute."
+_YOUTUBE_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("YOUTUBE_RATE_LIMIT_MAX_REQUESTS", "20"))
+_YOUTUBE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("YOUTUBE_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_YOUTUBE_RATE_LIMIT_MESSAGE = "Too many video requests. Please try again in a minute."
 _REDIS_URL = os.getenv("REDIS_URL", "").strip()
 _REDIS_TUTOR_RATE_LIMIT_PREFIX = os.getenv("REDIS_TUTOR_RATE_LIMIT_PREFIX", "ratelimit:tutor")
+_REDIS_SESSIONS_RATE_LIMIT_PREFIX = os.getenv("REDIS_SESSIONS_RATE_LIMIT_PREFIX", "ratelimit:sessions")
+_REDIS_YOUTUBE_RATE_LIMIT_PREFIX = os.getenv("REDIS_YOUTUBE_RATE_LIMIT_PREFIX", "ratelimit:youtube")
 _REDIS_UNAVAILABLE_MESSAGE = "Rate limiter backend unavailable. Please try again shortly."
 
 _tutor_rate_limit_bucket: dict[str, list[float]] = {}
+_sessions_rate_limit_bucket: dict[str, list[float]] = {}
+_youtube_rate_limit_bucket: dict[str, list[float]] = {}
 _tutor_rate_limit_lock = threading.Lock()
+_sessions_rate_limit_lock = threading.Lock()
+_youtube_rate_limit_lock = threading.Lock()
 
 _redis_client: Any = None
 _redis_client_lock = threading.Lock()
@@ -113,6 +125,49 @@ def _enforce_tutor_rate_limit_with_redis(current_user_id: str) -> None:
 
     if current_count > max_requests:
         raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
+
+
+def _enforce_rate_limit_with_redis(
+    current_user_id: str,
+    redis_prefix: str,
+    max_requests: int,
+    window_seconds: int,
+    limit_message: str,
+) -> None:
+    client = _get_redis_client()
+    if client is None:
+        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+
+    key = f"{redis_prefix}:{current_user_id}"
+
+    try:
+        current_count = int(client.eval(_REDIS_RATE_LIMIT_LUA, 1, key, max(window_seconds, 1)))
+    except Exception:
+        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+
+    if current_count > max(max_requests, 1):
+        raise HTTPException(status_code=429, detail=limit_message)
+
+
+def _enforce_rate_limit_in_memory(
+    current_user_id: str,
+    bucket: dict[str, list[float]],
+    lock: threading.Lock,
+    max_requests: int,
+    window_seconds: int,
+    limit_message: str,
+) -> None:
+    now = time.time()
+    window_start = now - max(window_seconds, 1)
+
+    with lock:
+        timestamps = bucket.setdefault(current_user_id, [])
+        timestamps[:] = [timestamp for timestamp in timestamps if timestamp >= window_start]
+
+        if len(timestamps) >= max(max_requests, 1):
+            raise HTTPException(status_code=429, detail=limit_message)
+
+        timestamps.append(now)
 
 
 def _jwks_url_for_token(token: str, prefer_env: bool = True) -> str:
@@ -248,16 +303,63 @@ def get_tutor_user_id_with_rate_limit(
         _enforce_tutor_rate_limit_with_redis(current_user_id)
         return current_user_id
 
-    now = time.time()
-    window_start = now - _TUTOR_RATE_LIMIT_WINDOW_SECONDS
+    _enforce_rate_limit_in_memory(
+        current_user_id,
+        _tutor_rate_limit_bucket,
+        _tutor_rate_limit_lock,
+        _TUTOR_RATE_LIMIT_MAX_REQUESTS,
+        _TUTOR_RATE_LIMIT_WINDOW_SECONDS,
+        _TUTOR_RATE_LIMIT_MESSAGE,
+    )
 
-    with _tutor_rate_limit_lock:
-        timestamps = _tutor_rate_limit_bucket.setdefault(current_user_id, [])
-        timestamps[:] = [timestamp for timestamp in timestamps if timestamp >= window_start]
+    return current_user_id
 
-        if len(timestamps) >= _TUTOR_RATE_LIMIT_MAX_REQUESTS:
-            raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
 
-        timestamps.append(now)
+def get_sessions_user_id_with_rate_limit(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    if _REDIS_URL:
+        _enforce_rate_limit_with_redis(
+            current_user_id,
+            _REDIS_SESSIONS_RATE_LIMIT_PREFIX,
+            _SESSIONS_RATE_LIMIT_MAX_REQUESTS,
+            _SESSIONS_RATE_LIMIT_WINDOW_SECONDS,
+            _SESSIONS_RATE_LIMIT_MESSAGE,
+        )
+        return current_user_id
+
+    _enforce_rate_limit_in_memory(
+        current_user_id,
+        _sessions_rate_limit_bucket,
+        _sessions_rate_limit_lock,
+        _SESSIONS_RATE_LIMIT_MAX_REQUESTS,
+        _SESSIONS_RATE_LIMIT_WINDOW_SECONDS,
+        _SESSIONS_RATE_LIMIT_MESSAGE,
+    )
+
+    return current_user_id
+
+
+def get_youtube_user_id_with_rate_limit(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    if _REDIS_URL:
+        _enforce_rate_limit_with_redis(
+            current_user_id,
+            _REDIS_YOUTUBE_RATE_LIMIT_PREFIX,
+            _YOUTUBE_RATE_LIMIT_MAX_REQUESTS,
+            _YOUTUBE_RATE_LIMIT_WINDOW_SECONDS,
+            _YOUTUBE_RATE_LIMIT_MESSAGE,
+        )
+        return current_user_id
+
+    _enforce_rate_limit_in_memory(
+        current_user_id,
+        _youtube_rate_limit_bucket,
+        _youtube_rate_limit_lock,
+        _YOUTUBE_RATE_LIMIT_MAX_REQUESTS,
+        _YOUTUBE_RATE_LIMIT_WINDOW_SECONDS,
+        _YOUTUBE_RATE_LIMIT_MESSAGE,
+    )
 
     return current_user_id

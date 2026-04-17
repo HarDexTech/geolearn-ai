@@ -10,7 +10,11 @@ from groq import Groq
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth import get_current_user_id, get_tutor_user_id_with_rate_limit
+from auth import (
+    get_current_user_id,
+    get_sessions_user_id_with_rate_limit,
+    get_tutor_user_id_with_rate_limit,
+)
 from database import SessionLocal, get_db
 from models import ChatHistory, ChatSession, User
 
@@ -320,7 +324,7 @@ def _get_or_create_user(
 @router.post("/sessions", response_model=SessionCreateResponse)
 def create_session(
     payload: SessionCreateRequest,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_sessions_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> SessionCreateResponse:
     user = _get_or_create_user(db, current_user_id, None, None)
@@ -338,7 +342,7 @@ def create_session(
 
 @router.get("/sessions", response_model=SessionsResponse)
 def get_sessions(
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_sessions_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> SessionsResponse:
     sessions = (
@@ -361,7 +365,7 @@ def get_sessions(
 @router.delete("/sessions/{session_id}")
 def delete_session(
     session_id: int,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_sessions_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     session = (
@@ -381,7 +385,7 @@ def delete_session(
 @router.get("/sessions/{session_id}/messages", response_model=SessionMessagesResponse)
 def get_session_messages(
     session_id: int,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_sessions_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> SessionMessagesResponse:
     session = (
