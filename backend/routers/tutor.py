@@ -93,21 +93,21 @@ def _build_messages(question: str, history: list[tuple[str, str]]) -> list[dict[
     return messages
 
 
-def _build_gemini_prompt(question: str, history: list[tuple[str, str]]) -> str:
-    if not history:
-        return question
-
-    transcript_lines = []
+def _build_gemini_contents(question: str, history: list[tuple[str, str]]) -> list[dict[str, object]]:
+    contents: list[dict[str, object]] = []
     for prev_question, prev_answer in history:
-        transcript_lines.append(f"User: {prev_question}")
-        transcript_lines.append(f"Assistant: {prev_answer}")
+        contents.append({"role": "user", "parts": [{"text": prev_question}]})
+        contents.append({"role": "model", "parts": [{"text": prev_answer}]})
 
-    transcript = "\n".join(transcript_lines)
-    return (
-        "Use the prior conversation context to answer the latest user question.\n\n"
-        f"Conversation history:\n{transcript}\n\n"
-        f"Latest user question:\n{question}"
-    )
+    contents.append({"role": "user", "parts": [{"text": question}]})
+    return contents
+
+
+def _normalize_question(raw_question: str) -> str:
+    sanitized = raw_question.replace("\x00", "").strip()
+    if len(sanitized) < 3:
+        raise HTTPException(status_code=422, detail="Question must contain at least 3 characters.")
+    return sanitized
 
 
 def _load_session_context(
@@ -199,7 +199,7 @@ def _call_gemini(question: str, api_key: str, history: list[tuple[str, str]]) ->
         system_instruction=SYSTEM_PROMPT,
     )
 
-    response = model.generate_content(_build_gemini_prompt(question, history))
+    response = model.generate_content(_build_gemini_contents(question, history))
     text = getattr(response, "text", None)
     if text and text.strip():
         return text.strip()
@@ -250,7 +250,7 @@ def _stream_gemini(
         system_instruction=SYSTEM_PROMPT,
     )
 
-    stream = model.generate_content(_build_gemini_prompt(question, history), stream=True)
+    stream = model.generate_content(_build_gemini_contents(question, history), stream=True)
     for chunk in stream:
         text = getattr(chunk, "text", None)
         if text:
@@ -323,7 +323,7 @@ def create_session(
     current_user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> SessionCreateResponse:
-    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
+    user = _get_or_create_user(db, current_user_id, None, None)
     title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=422, detail="Session title cannot be empty.")
@@ -445,7 +445,8 @@ def tutor(
     current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> TutorResponse:
-    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
+    user = _get_or_create_user(db, current_user_id, None, None)
+    question = _normalize_question(payload.question)
 
     session_id = payload.session_id
     if session_id is not None:
@@ -458,12 +459,12 @@ def tutor(
             raise HTTPException(status_code=404, detail="Session not found for this user.")
 
     context_history = _load_session_context(db, user.id, session_id)
-    answer = generate_answer(payload.question, context_history)
+    answer = generate_answer(question, context_history)
 
     chat = ChatHistory(
         user_id=user.id,
         session_id=session_id,
-        question=payload.question,
+        question=question,
         answer=answer,
     )
     db.add(chat)
@@ -482,7 +483,8 @@ def tutor_stream(
     current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    user = _get_or_create_user(db, current_user_id, payload.email, payload.name)
+    user = _get_or_create_user(db, current_user_id, None, None)
+    question = _normalize_question(payload.question)
     db.commit()
     db.refresh(user)
 
@@ -504,7 +506,7 @@ def tutor_stream(
     def _event_stream() -> Generator[str, None, None]:
         try:
             answer = ""
-            for piece in _stream_answer(payload.question, context_history):
+            for piece in _stream_answer(question, context_history):
                 answer += piece
                 yield _event({"type": "chunk", "text": piece})
 
@@ -517,7 +519,7 @@ def tutor_stream(
                 chat = ChatHistory(
                     user_id=user.id,
                     session_id=session_id,
-                    question=payload.question,
+                    question=question,
                     answer=final_answer,
                 )
                 stream_db.add(chat)

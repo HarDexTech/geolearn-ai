@@ -77,7 +77,8 @@ def on_startup() -> None:
         Base.metadata.create_all(bind=engine)
         _ensure_session_schema()
     except Exception as exc:
-        logging.warning(f"Startup DB init failed (will retry on first request): {exc}")
+        logging.exception("Startup DB init failed; refusing to start.")
+        raise RuntimeError("Database initialization failed") from exc
 
 
 @app.get("/health")

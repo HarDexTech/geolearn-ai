@@ -18,6 +18,7 @@ CLERK_JWKS_URL = os.getenv(
     "CLERK_JWKS_URL",
     "https://api.clerk.com/v1/jwks",
 )
+CLERK_JWT_AUDIENCE = os.getenv("CLERK_JWT_AUDIENCE", "").strip()
 
 _CLERK_ISS_RE = re.compile(
     r"^https://(?:[a-z0-9-]+\.)*[a-z0-9-]+\.clerk\.(?:accounts\.dev|com)/?$",
@@ -219,13 +220,16 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
 
     signing_key = _get_signing_key(token)
 
+    decode_options = {"verify_aud": bool(CLERK_JWT_AUDIENCE)}
+    decode_kwargs: dict[str, Any] = {
+        "algorithms": ["RS256"],
+        "options": decode_options,
+    }
+    if CLERK_JWT_AUDIENCE:
+        decode_kwargs["audience"] = CLERK_JWT_AUDIENCE
+
     try:
-        payload = jwt.decode(
-            token,
-            signing_key,
-            algorithms=["RS256"],
-            options={"verify_aud": False},
-        )
+        payload = jwt.decode(token, signing_key, **decode_kwargs)
     except PyJWTError as exc:
         raise _unauthorized() from exc
 
