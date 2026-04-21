@@ -50,6 +50,16 @@ _REDIS_SESSIONS_RATE_LIMIT_PREFIX = os.getenv("REDIS_SESSIONS_RATE_LIMIT_PREFIX"
 _REDIS_YOUTUBE_RATE_LIMIT_PREFIX = os.getenv("REDIS_YOUTUBE_RATE_LIMIT_PREFIX", "ratelimit:youtube")
 _REDIS_UNAVAILABLE_MESSAGE = "Rate limiter backend unavailable. Please try again shortly."
 
+
+def _is_truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+_ENVIRONMENT = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")).lower()
+_RATE_LIMIT_REDIS_STRICT = _is_truthy(
+    os.getenv("RATE_LIMIT_REDIS_STRICT", "true" if _ENVIRONMENT == "production" else "false")
+)
+
 _tutor_rate_limit_bucket: dict[str, list[float]] = {}
 _sessions_rate_limit_bucket: dict[str, list[float]] = {}
 _youtube_rate_limit_bucket: dict[str, list[float]] = {}
@@ -109,10 +119,12 @@ def _get_redis_client() -> Any:
     return _redis_client
 
 
-def _enforce_tutor_rate_limit_with_redis(current_user_id: str) -> None:
+def _enforce_tutor_rate_limit_with_redis(current_user_id: str) -> bool:
     client = _get_redis_client()
     if client is None:
-        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        if _RATE_LIMIT_REDIS_STRICT:
+            raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        return False
 
     window_seconds = max(_TUTOR_RATE_LIMIT_WINDOW_SECONDS, 1)
     max_requests = max(_TUTOR_RATE_LIMIT_MAX_REQUESTS, 1)
@@ -121,10 +133,14 @@ def _enforce_tutor_rate_limit_with_redis(current_user_id: str) -> None:
     try:
         current_count = int(client.eval(_REDIS_RATE_LIMIT_LUA, 1, key, window_seconds))
     except Exception:
-        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        if _RATE_LIMIT_REDIS_STRICT:
+            raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        return False
 
     if current_count > max_requests:
         raise HTTPException(status_code=429, detail=_TUTOR_RATE_LIMIT_MESSAGE)
+
+    return True
 
 
 def _enforce_rate_limit_with_redis(
@@ -133,20 +149,26 @@ def _enforce_rate_limit_with_redis(
     max_requests: int,
     window_seconds: int,
     limit_message: str,
-) -> None:
+) -> bool:
     client = _get_redis_client()
     if client is None:
-        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        if _RATE_LIMIT_REDIS_STRICT:
+            raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        return False
 
     key = f"{redis_prefix}:{current_user_id}"
 
     try:
         current_count = int(client.eval(_REDIS_RATE_LIMIT_LUA, 1, key, max(window_seconds, 1)))
     except Exception:
-        raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        if _RATE_LIMIT_REDIS_STRICT:
+            raise HTTPException(status_code=503, detail=_REDIS_UNAVAILABLE_MESSAGE)
+        return False
 
     if current_count > max(max_requests, 1):
         raise HTTPException(status_code=429, detail=limit_message)
+
+    return True
 
 
 def _enforce_rate_limit_in_memory(
@@ -298,10 +320,11 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
 def get_tutor_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
-    # If Redis is configured, enforce limits through the shared backend only.
+    # If Redis is configured, use it when available.
     if _REDIS_URL:
-        _enforce_tutor_rate_limit_with_redis(current_user_id)
-        return current_user_id
+        enforced_with_redis = _enforce_tutor_rate_limit_with_redis(current_user_id)
+        if enforced_with_redis:
+            return current_user_id
 
     _enforce_rate_limit_in_memory(
         current_user_id,
@@ -319,14 +342,15 @@ def get_sessions_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
     if _REDIS_URL:
-        _enforce_rate_limit_with_redis(
+        enforced_with_redis = _enforce_rate_limit_with_redis(
             current_user_id,
             _REDIS_SESSIONS_RATE_LIMIT_PREFIX,
             _SESSIONS_RATE_LIMIT_MAX_REQUESTS,
             _SESSIONS_RATE_LIMIT_WINDOW_SECONDS,
             _SESSIONS_RATE_LIMIT_MESSAGE,
         )
-        return current_user_id
+        if enforced_with_redis:
+            return current_user_id
 
     _enforce_rate_limit_in_memory(
         current_user_id,
@@ -344,14 +368,15 @@ def get_youtube_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
     if _REDIS_URL:
-        _enforce_rate_limit_with_redis(
+        enforced_with_redis = _enforce_rate_limit_with_redis(
             current_user_id,
             _REDIS_YOUTUBE_RATE_LIMIT_PREFIX,
             _YOUTUBE_RATE_LIMIT_MAX_REQUESTS,
             _YOUTUBE_RATE_LIMIT_WINDOW_SECONDS,
             _YOUTUBE_RATE_LIMIT_MESSAGE,
         )
-        return current_user_id
+        if enforced_with_redis:
+            return current_user_id
 
     _enforce_rate_limit_in_memory(
         current_user_id,

@@ -13,6 +13,16 @@ app = FastAPI(title="GeoLearn AI API")
 frontend_origin = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "http://localhost:3000")
 environment = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")).lower()
 
+
+def _is_truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# Fail fast in production by default; allow local dev override via env.
+db_startup_strict = _is_truthy(
+    os.getenv("DB_STARTUP_STRICT", "true" if environment == "production" else "false")
+)
+
 allow_origins = [frontend_origin]
 if environment != "production":
     allow_origins.append("http://127.0.0.1:3000")
@@ -77,8 +87,11 @@ def on_startup() -> None:
         Base.metadata.create_all(bind=engine)
         _ensure_session_schema()
     except Exception as exc:
-        logging.exception("Startup DB init failed; refusing to start.")
-        raise RuntimeError("Database initialization failed") from exc
+        if db_startup_strict:
+            logging.exception("Startup DB init failed; refusing to start.")
+            raise RuntimeError("Database initialization failed") from exc
+
+        logging.exception("Startup DB init failed; continuing because DB_STARTUP_STRICT is disabled.")
 
 
 @app.get("/health")

@@ -149,7 +149,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
         <Link href="/" className="text-3xl font-black tracking-tight">
           GeoLearn AI
@@ -165,7 +165,7 @@ export default function DashboardPage() {
             type="button"
             data-mobile-nav-toggle
             onClick={() => setMobileNavOpen((prev) => !prev)}
-            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+            className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
             aria-label="Toggle navigation menu"
           >
             ☰
@@ -178,7 +178,7 @@ export default function DashboardPage() {
         <div className="mx-auto w-full max-w-7xl px-6 pb-2 md:hidden">
           <nav
             data-mobile-nav
-            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+            className="rounded-xl border border-(--color-border) bg-white p-2 shadow-sm"
           >
             <Link
               href="/"
@@ -213,7 +213,7 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="mx-auto w-full max-w-4xl px-6 pb-8">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5">
+        <div className="rounded-2xl border border-(--color-border) bg-white p-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">AI GIS Tutor</h2>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div className="mt-4 h-[540px] space-y-4 overflow-y-auto rounded-xl bg-slate-50 p-4">
+          <div className="mt-4 h-135 space-y-4 overflow-y-auto rounded-xl bg-slate-50 p-4">
             {messages.length === 0 ? (
               <p className="text-sm text-slate-500">
                 Ask a GIS question to get step-by-step help and related video
@@ -248,8 +248,8 @@ export default function DashboardPage() {
                 <div
                   className={`rounded-xl p-4 text-sm leading-7 ${
                     message.role === "user"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "border border-[var(--color-border)] bg-white"
+                      ? "bg-(--color-primary) text-white"
+                      : "border border-(--color-border) bg-white"
                   }`}
                 >
                   {message.role === "assistant" ? (
@@ -267,7 +267,7 @@ export default function DashboardPage() {
                 </div>
 
                 {message.role === "assistant" && message.videos?.length ? (
-                  <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-white p-3">
+                  <div className="mt-3 rounded-xl border border-(--color-border) bg-white p-3">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                       Recommended Tutorials
                     </p>
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                           href={video.video_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-lg border border-[var(--color-border)] p-2"
+                          className="rounded-lg border border-(--color-border) p-2"
                         >
                           {video.thumbnail ? (
                             <Image
@@ -306,7 +306,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-slate-100 p-2">
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-(--color-border) bg-slate-100 p-2">
             <input
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
@@ -322,7 +322,7 @@ export default function DashboardPage() {
               type="button"
               disabled={!canSend}
               onClick={() => void handleAsk()}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Send
             </button>

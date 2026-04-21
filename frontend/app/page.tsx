@@ -1,11 +1,11 @@
-import Link from 'next/link';
-import { SignInButton, UserButton } from '@clerk/nextjs';
-import Image from 'next/image';
-import { Show } from '@/components/show';
+import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
+import Image from "next/image";
+import { Show } from "@/components/show";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-3xl font-black tracking-tight">
           GeoLearn AI
@@ -13,7 +13,7 @@ export default function Home() {
         <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-700 md:flex">
           <Link
             href="/"
-            className="border-b-2 border-[var(--color-primary)] pb-1 text-slate-900"
+            className="border-b-2 border-(--color-primary) pb-1 text-slate-900"
           >
             Home
           </Link>
@@ -22,14 +22,12 @@ export default function Home() {
           <Link href="/about">About</Link>
         </nav>
         <Show when="signed-out">
-          <SignInButton>
-            <button
-              type="button"
-              className="rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold"
-            >
-              Sign In
-            </button>
-          </SignInButton>
+          <Link
+            href="/sign-in"
+            className="rounded-full border border-(--color-border) px-4 py-2 text-sm font-semibold"
+          >
+            Sign In
+          </Link>
         </Show>
         <Show when="signed-in">
           <UserButton />
@@ -39,7 +37,7 @@ export default function Home() {
       <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 pb-20 pt-8 lg:grid-cols-2">
         <div>
           <h1 className="text-6xl font-black leading-[0.95] tracking-tight sm:text-7xl">
-            Your GIS Learning Assistant,{' '}
+            Your GIS Learning Assistant,{" "}
             <span className="text-emerald-700">Built for Nigeria</span>
           </h1>
           <p className="mt-7 max-w-xl text-xl leading-8 text-slate-600">
@@ -49,13 +47,13 @@ export default function Home() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               href="/datasets"
-              className="rounded-lg bg-[var(--color-primary)] px-6 py-3 font-semibold text-white shadow-sm transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
+              className="rounded-lg bg-(--color-primary) px-6 py-3 font-semibold text-white shadow-sm transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
             >
               Explore Datasets
             </Link>
             <Link
               href="/tutor"
-              className="rounded-lg border border-[var(--color-border)] bg-white px-6 py-3 font-semibold text-slate-800 transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
+              className="rounded-lg border border-(--color-border) bg-white px-6 py-3 font-semibold text-slate-800 transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
             >
               Try AI Tutor
             </Link>
@@ -63,7 +61,7 @@ export default function Home() {
         </div>
 
         <div className="relative">
-          <div className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-950 to-emerald-800 shadow-2xl transition-transform duration-700 hover:scale-[1.02]">
+          <div className="rounded-2xl border border-emerald-900/20 bg-linear-to-br from-emerald-950 to-emerald-800 shadow-2xl transition-transform duration-700 hover:scale-[1.02]">
             <Image
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2baMP8SqKWxvCczy68xIU5wj4zVPnyCk8MJkk0LeBpPcH12uK3GZELy80sg4tLFG4UJPhE1N3nA1yEiNVQhrXViyMbUomOVBooldZ3tWlZ5Yg6--5ualaHnuZD2160sgWa6DYTh4hCXeTJrkuLUPe9vTyjFrOWKkunOneIW0JIdVlSo2TdBfnDpAwgCYLV6USKfkw39m4pFV_W4IH_4r76CxRq8JDp5PN7AtHPb72KpzfM2IzyEmHwJQOWw6pZ-XqmbX-WuGhcxg"
               alt="Satellite view of Nigerian landscape with digital data overlays and topological contour lines in emerald green tones"
@@ -73,7 +71,7 @@ export default function Home() {
               priority
             />
           </div>
-          <div className="absolute -bottom-6 left-6 max-w-xs rounded-xl border border-[var(--color-border)] bg-white/90 p-4 shadow-lg backdrop-blur">
+          <div className="absolute -bottom-6 left-6 max-w-xs rounded-xl border border-(--color-border) bg-white/90 p-4 shadow-lg backdrop-blur">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
               AI Insights
             </p>
@@ -85,23 +83,23 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-[var(--color-primary)] py-10 text-white">
+      <section className="bg-(--color-primary) py-10 text-white">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 md:grid-cols-3">
           <article>
             <p className="text-6xl font-black">90%</p>
-            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+            <p className="text-sm uppercase tracking-widest text-emerald-100">
               Of GIS students struggle finding datasets
             </p>
           </article>
           <article>
             <p className="text-6xl font-black">100%</p>
-            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+            <p className="text-sm uppercase tracking-widest text-emerald-100">
               Found an AI tutor useful
             </p>
           </article>
           <article>
             <p className="text-6xl font-black">10,000+</p>
-            <p className="text-sm uppercase tracking-[0.1em] text-emerald-100">
+            <p className="text-sm uppercase tracking-widest text-emerald-100">
               Nigerian GIS students
             </p>
           </article>
@@ -118,7 +116,7 @@ export default function Home() {
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
-          <article className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm">
+          <article className="rounded-2xl border border-(--color-border) bg-white p-6 shadow-sm">
             <h3 className="text-2xl font-bold">Dataset Library</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Access high-quality Nigerian geospatial datasets including
@@ -126,7 +124,7 @@ export default function Home() {
             </p>
             <div className="mt-5 h-24 rounded-xl bg-[radial-gradient(circle_at_20%_20%,#d6e9dc,#e2e8f0_60%,#f1f5f9)]" />
           </article>
-          <article className="rounded-2xl border border-emerald-900/20 bg-gradient-to-br from-emerald-900 to-emerald-700 p-6 text-white shadow-lg">
+          <article className="rounded-2xl border border-emerald-900/20 bg-linear-to-br from-emerald-900 to-emerald-700 p-6 text-white shadow-lg">
             <h3 className="text-2xl font-bold">AI GIS Tutor</h3>
             <p className="mt-3 text-sm leading-6 text-emerald-100">
               Solve GIS errors with step-by-step support for QGIS, ArcGIS, and
@@ -136,7 +134,7 @@ export default function Home() {
               AI Tutor Online
             </div>
           </article>
-          <article className="rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm">
+          <article className="rounded-2xl border border-(--color-border) bg-white p-6 shadow-sm">
             <h3 className="text-2xl font-bold">YouTube Tutorials</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Integrated tutorial recommendations for visual learners with
@@ -147,7 +145,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-[var(--color-border)] bg-slate-100">
+      <footer className="border-t border-(--color-border) bg-slate-100">
         <div className="mx-auto w-full max-w-7xl px-6 py-6 text-center text-sm text-slate-600">
           <p>© 2026 GeoLearn AI. Built for Nigerian GIS students.</p>
         </div>
