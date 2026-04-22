@@ -38,7 +38,7 @@ export type TutorStreamEvent =
   | { type: "done"; chat_id: number }
   | { type: "error"; message: string };
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
 async function request<T>(
   path: string,

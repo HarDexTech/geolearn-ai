@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [loadingTutor, setLoadingTutor] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const canSend = useMemo(
     () => question.trim().length > 2 && !loadingTutor,
@@ -145,6 +146,23 @@ export default function DashboardPage() {
       );
     } finally {
       setLoadingTutor(false);
+    }
+  }
+
+  async function handleCopyResponse(messageId: string, text: string) {
+    const value = text.trim();
+    if (!value) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedMessageId(messageId);
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === messageId ? null : current));
+      }, 1500);
+    } catch {
+      setError("Unable to copy response right now.");
     }
   }
 
@@ -300,6 +318,20 @@ export default function DashboardPage() {
                         </a>
                       ))}
                     </div>
+                  </div>
+                ) : null}
+                {message.role === "assistant" ? (
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleCopyResponse(message.id, message.content)
+                      }
+                      disabled={!message.content.trim()}
+                      className="rounded-md border border-(--color-border) bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {copiedMessageId === message.id ? "Copied" : "Copy"}
+                    </button>
                   </div>
                 ) : null}
               </div>

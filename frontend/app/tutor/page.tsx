@@ -25,12 +25,28 @@ type Message = {
   videos: YoutubeVideo[];
 };
 
+type SessionMessagesCache = Record<string, Message[]>;
+
+type PersistedTutorState = {
+  userId: string;
+  hasFetchedSessions: boolean;
+  sessions: SessionItem[];
+  activeSessionId: number | null;
+  messages: Message[];
+  sessionMessagesCache: SessionMessagesCache;
+};
+
+let tutorRuntimeCache: PersistedTutorState | null = null;
+
 export default function TutorPage() {
   const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sessionMessagesCache, setSessionMessagesCache] =
+    useState<SessionMessagesCache>({});
+  const [hasFetchedSessions, setHasFetchedSessions] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [loadingSend, setLoadingSend] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -42,6 +58,7 @@ export default function TutorPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const canSend = useMemo(
     () => prompt.trim().length > 2 && !loadingSend,
@@ -62,22 +79,35 @@ export default function TutorPage() {
     }
 
     let active = true;
-
     const fetchSessions = async () => {
       setLoadingSessions(true);
+      setError(null);
       try {
         const token = await getAuthTokenOrThrow();
         const result = await getSessions(token);
         if (!active) {
           return;
         }
+
         setSessions(result.sessions);
-        setActiveSessionId(null);
-        setMessages([]);
+        setHasFetchedSessions(true);
+        if (result.sessions.length === 0) {
+          setActiveSessionId(null);
+          setMessages([]);
+          setSessionMessagesCache({});
+        } else {
+          // Always enter tutor page in "new chat" mode.
+          setActiveSessionId(null);
+          setMessages([]);
+          if (active) {
+            setLoadingMessages(false);
+          }
+        }
       } catch (err) {
         if (!active) {
           return;
         }
+        setHasFetchedSessions(false);
 
         setError(
           err instanceof Error
@@ -91,12 +121,77 @@ export default function TutorPage() {
       }
     };
 
+    const hydrateFromMemory = (): boolean => {
+      if (!tutorRuntimeCache || tutorRuntimeCache.userId !== user.id) {
+        return false;
+      }
+
+      if (!tutorRuntimeCache.hasFetchedSessions) {
+        return false;
+      }
+
+      setSessions(tutorRuntimeCache.sessions);
+      setSessionMessagesCache(tutorRuntimeCache.sessionMessagesCache);
+      // Always enter tutor page in "new chat" mode.
+      setActiveSessionId(null);
+      setMessages([]);
+
+      setHasFetchedSessions(true);
+      setLoadingSessions(false);
+      setLoadingMessages(false);
+      setError(null);
+      return true;
+    };
+
+    if (hydrateFromMemory()) {
+      return () => {
+        active = false;
+      };
+    }
+
     void fetchSessions();
 
     return () => {
       active = false;
     };
   }, [getAuthTokenOrThrow, isLoaded, user?.id]);
+
+  useEffect(() => {
+    if (activeSessionId === null) {
+      return;
+    }
+
+    const key = String(activeSessionId);
+    setSessionMessagesCache((prev) => {
+      if (prev[key] === messages) {
+        return prev;
+      }
+      return { ...prev, [key]: messages };
+    });
+  }, [activeSessionId, messages]);
+
+  useEffect(() => {
+    if (!isLoaded || !user?.id) {
+      return;
+    }
+
+    tutorRuntimeCache = {
+      userId: user.id,
+      hasFetchedSessions,
+      sessions,
+      activeSessionId,
+      messages,
+      sessionMessagesCache,
+    };
+  }, [
+    isLoaded,
+    user?.id,
+    hasFetchedSessions,
+    sessions,
+    activeSessionId,
+    messages,
+    sessionMessagesCache,
+  ]);
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -127,17 +222,27 @@ export default function TutorPage() {
     setOpenMenuId(null);
     setSidebarOpen(false);
 
+    const cachedMessages = sessionMessagesCache[String(sessionId)];
+    if (cachedMessages) {
+      setMessages(cachedMessages);
+      setLoadingMessages(false);
+      return;
+    }
+
     try {
       const token = await getAuthTokenOrThrow();
       const result = await getSessionMessages(sessionId, token);
-      setMessages(
-        result.messages.map((message) => ({
-          id: String(message.id),
-          question: message.question,
-          answer: message.answer,
-          videos: [],
-        })),
-      );
+      const mappedMessages = result.messages.map((message) => ({
+        id: String(message.id),
+        question: message.question,
+        answer: message.answer,
+        videos: [],
+      }));
+      setMessages(mappedMessages);
+      setSessionMessagesCache((prev) => ({
+        ...prev,
+        [String(sessionId)]: mappedMessages,
+      }));
     } catch (err) {
       setError(
         err instanceof Error
@@ -147,6 +252,23 @@ export default function TutorPage() {
       setMessages([]);
     } finally {
       setLoadingMessages(false);
+    }
+  }
+
+  async function handleCopyResponse(messageId: string, text: string) {
+    const value = text.trim();
+    if (!value) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedMessageId(messageId);
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === messageId ? null : current));
+      }, 1500);
+    } catch {
+      setError("Unable to copy response right now.");
     }
   }
 
@@ -168,6 +290,11 @@ export default function TutorPage() {
       const token = await getAuthTokenOrThrow();
       await deleteSession(sessionId, token);
       setSessions((prev) => prev.filter((session) => session.id !== sessionId));
+      setSessionMessagesCache((prev) => {
+        const next = { ...prev };
+        delete next[String(sessionId)];
+        return next;
+      });
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
         setMessages([]);
@@ -511,6 +638,16 @@ export default function TutorPage() {
                     </div>
                   </div>
                 ) : null}
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyResponse(message.id, message.answer)}
+                    disabled={!message.answer.trim()}
+                    className="rounded-md border border-[var(--color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {copiedMessageId === message.id ? "Copied" : "Copy"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

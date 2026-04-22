@@ -13,6 +13,68 @@ router = APIRouter(prefix="/api", tags=["youtube"])
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
 
+def _extract_youtube_error_reason(payload: dict[str, object]) -> str | None:
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return None
+
+    errors = error.get("errors")
+    if not isinstance(errors, list) or not errors:
+        return None
+
+    first_error = errors[0]
+    if not isinstance(first_error, dict):
+        return None
+
+    reason = first_error.get("reason")
+    return reason if isinstance(reason, str) else None
+
+
+def _upstream_error_to_http_exception(response: httpx.Response) -> HTTPException:
+    payload: dict[str, object] = {}
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+
+    reason = (_extract_youtube_error_reason(payload) or "").lower()
+
+    if reason in {"quotaexceeded", "dailylimitexceeded", "ratelimitexceeded"}:
+        return HTTPException(
+            status_code=429,
+            detail="YouTube quota limit reached. Please try again later.",
+        )
+
+    if reason in {"keyinvalid", "accessnotconfigured", "iprefererblocked"}:
+        return HTTPException(
+            status_code=503,
+            detail="YouTube API key is invalid or restricted for this server.",
+        )
+
+    if response.status_code == 403:
+        return HTTPException(
+            status_code=429,
+            detail="YouTube request was denied. Check quota and API key restrictions.",
+        )
+
+    if response.status_code in {400, 401}:
+        return HTTPException(
+            status_code=503,
+            detail="YouTube API credentials are misconfigured.",
+        )
+
+    if response.status_code >= 500:
+        return HTTPException(
+            status_code=502,
+            detail="YouTube service is temporarily unavailable. Please try again later.",
+        )
+
+    return HTTPException(
+        status_code=502,
+        detail="Unable to fetch videos from YouTube right now.",
+    )
+
+
 @router.get("/youtube")
 async def youtube(
     query: str = Query(min_length=2, max_length=120),
@@ -30,25 +92,23 @@ async def youtube(
         "key": api_key,
     }
 
+    timeout = httpx.Timeout(connect=8.0, read=12.0, write=12.0, pool=8.0)
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(YOUTUBE_SEARCH_URL, params=params)
     except httpx.TimeoutException as exc:
-        raise HTTPException(status_code=504, detail="YouTube API request timed out.") from exc
+        raise HTTPException(
+            status_code=504,
+            detail="YouTube API connection timed out. Check your network and try again.",
+        ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
-            detail="Unable to fetch videos from YouTube right now.",
+            detail="Unable to reach YouTube from the backend right now.",
         ) from exc
 
     if response.status_code != 200:
-        status = 429 if response.status_code == 403 else 502
-        detail = (
-            "YouTube quota limit reached. Please try again later."
-            if status == 429
-            else "Unable to fetch videos from YouTube right now."
-        )
-        raise HTTPException(status_code=status, detail=detail)
+        raise _upstream_error_to_http_exception(response)
 
     payload = response.json()
     items = payload.get("items", [])

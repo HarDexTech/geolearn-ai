@@ -26,6 +26,7 @@ db_startup_strict = _is_truthy(
 allow_origins = [frontend_origin]
 if environment != "production":
     allow_origins.append("http://127.0.0.1:3000")
+    allow_origins.append("http://localhost:3000")
 
 allow_origins = list(dict.fromkeys(allow_origins))
 
