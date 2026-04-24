@@ -97,8 +97,6 @@ export async function getDatasets(params?: {
 export async function askTutor(
   payload: {
     question: string;
-    email?: string;
-    name?: string;
     session_id?: number;
   },
   token?: string,
@@ -116,8 +114,6 @@ export async function askTutor(
 export async function askTutorStream(
   payload: {
     question: string;
-    email?: string;
-    name?: string;
     session_id?: number;
   },
   token: string,
@@ -215,8 +211,6 @@ export async function getChats(token?: string): Promise<{ chats: ChatItem[] }> {
 export async function createSession(
   payload: {
     title: string;
-    email?: string;
-    name?: string;
   },
   token?: string,
 ): Promise<{ session_id: number; title: string }> {

@@ -216,7 +216,7 @@ def _jwks_url_for_token(token: str, prefer_env: bool = True) -> str:
     return f"{normalized_issuer}/.well-known/jwks.json"
 
 
-def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
+async def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
     now = time.time()
 
     with _jwks_cache_lock:
@@ -233,9 +233,10 @@ def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
                 return cached_payload
 
         try:
-            response = httpx.get(url, timeout=10.0)
-            response.raise_for_status()
-            payload = response.json()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
         except Exception as exc:
             if (
                 not force_refresh
@@ -257,7 +258,7 @@ def _fetch_jwks(url: str, force_refresh: bool = False) -> dict[str, Any]:
         return payload
 
 
-def _get_signing_key(token: str) -> Any:
+async def _get_signing_key(token: str) -> Any:
     try:
         unverified_header = jwt.get_unverified_header(token)
     except PyJWTError as exc:
@@ -277,7 +278,7 @@ def _get_signing_key(token: str) -> Any:
     for url in jwks_urls:
         for refresh in (False, True):
             try:
-                jwks = _fetch_jwks(url, force_refresh=refresh)
+                jwks = await _fetch_jwks(url, force_refresh=refresh)
             except HTTPException:
                 break
             for jwk in jwks.get("keys", []):
@@ -287,7 +288,7 @@ def _get_signing_key(token: str) -> Any:
     raise _unauthorized()
 
 
-def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
+async def get_current_user_id(authorization: str | None = Header(default=None)) -> str:
     if not authorization:
         raise _unauthorized("Missing Authorization header")
 
@@ -295,7 +296,7 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
     if scheme.lower() != "bearer" or not token:
         raise _unauthorized("Authorization header must use Bearer token")
 
-    signing_key = _get_signing_key(token)
+    signing_key = await _get_signing_key(token)
 
     decode_options = {"verify_aud": bool(CLERK_JWT_AUDIENCE)}
     decode_kwargs: dict[str, Any] = {
@@ -317,7 +318,7 @@ def get_current_user_id(authorization: str | None = Header(default=None)) -> str
     return subject
 
 
-def get_tutor_user_id_with_rate_limit(
+async def get_tutor_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
     # If Redis is configured, use it when available.
@@ -338,7 +339,7 @@ def get_tutor_user_id_with_rate_limit(
     return current_user_id
 
 
-def get_sessions_user_id_with_rate_limit(
+async def get_sessions_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
     if _REDIS_URL:
@@ -364,7 +365,7 @@ def get_sessions_user_id_with_rate_limit(
     return current_user_id
 
 
-def get_youtube_user_id_with_rate_limit(
+async def get_youtube_user_id_with_rate_limit(
     current_user_id: str = Depends(get_current_user_id),
 ) -> str:
     if _REDIS_URL:

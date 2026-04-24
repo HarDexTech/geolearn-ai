@@ -24,7 +24,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-2xl font-bold tracking-tight">
           GeoLearn AI
@@ -33,7 +33,7 @@ export default function AboutPage() {
           <Link href="/">Home</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
-          <span className="border-b-2 border-[var(--color-primary)] pb-1 text-slate-900">
+          <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             About
           </span>
         </nav>
@@ -41,7 +41,7 @@ export default function AboutPage() {
           type="button"
           data-mobile-nav-toggle
           onClick={() => setMobileNavOpen((prev) => !prev)}
-          className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+          className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
           aria-label="Toggle navigation menu"
         >
           ☰
@@ -52,7 +52,7 @@ export default function AboutPage() {
         <div className="mx-auto w-full max-w-6xl px-6 pb-2 md:hidden">
           <nav
             data-mobile-nav
-            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+            className="rounded-xl border border-(--color-border) bg-white p-2 shadow-sm"
           >
             <Link
               href="/"
@@ -87,8 +87,8 @@ export default function AboutPage() {
       ) : null}
 
       <section className="mx-auto grid w-full max-w-6xl gap-10 px-6 pb-24 pt-8 lg:grid-cols-2">
-        <article className="rounded-2xl border border-[var(--color-border)] bg-white p-8 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]">
+        <article className="rounded-2xl border border-(--color-border) bg-white p-8 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--color-primary)">
             Mission
           </p>
           <h1 className="mt-3 text-4xl font-extrabold leading-tight">
@@ -101,8 +101,8 @@ export default function AboutPage() {
           </p>
         </article>
 
-        <article className="rounded-2xl border border-[var(--color-border)] bg-white p-8 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]">
+        <article className="rounded-2xl border border-(--color-border) bg-white p-8 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--color-primary)">
             Founder Story
           </p>
           <h2 className="mt-3 text-2xl font-bold">Ayomide Adesina</h2>
@@ -114,15 +114,15 @@ export default function AboutPage() {
           </p>
         </article>
 
-        <article className="rounded-2xl border border-[var(--color-border)] bg-white p-8 shadow-sm lg:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]">
+        <article className="rounded-2xl border border-(--color-border) bg-white p-8 shadow-sm lg:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-(--color-primary)">
             Contact
           </p>
           <h2 className="mt-3 text-2xl font-bold">Reach out</h2>
           <p className="mt-4 text-slate-600">
             Email:{' '}
             <a
-              className="font-semibold text-[var(--color-primary)]"
+              className="font-semibold text-(--color-primary)"
               href="mailto:adesinayomide2@gmail.com"
             >
               adesinayomide2@gmail.com

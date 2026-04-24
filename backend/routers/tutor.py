@@ -29,8 +29,6 @@ UNAVAILABLE_MESSAGE = "All AI providers are currently unavailable. Please try ag
 
 class TutorRequest(BaseModel):
     question: str = Field(min_length=3, max_length=4000)
-    email: str | None = None
-    name: str | None = None
     session_id: int | None = None
 
 
@@ -52,8 +50,6 @@ class ChatsResponse(BaseModel):
 
 class SessionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=50)
-    email: str | None = None
-    name: str | None = None
 
 
 class SessionCreateResponse(BaseModel):
@@ -304,20 +300,13 @@ def _stream_answer(question: str, history: list[tuple[str, str]]) -> Generator[s
 def _get_or_create_user(
     db: Session,
     clerk_user_id: str,
-    email: str | None,
-    name: str | None,
 ) -> User:
     user = db.query(User).filter(User.clerk_id == clerk_user_id).first()
     if user is None:
-        user = User(clerk_id=clerk_user_id, email=email, name=name)
+        user = User(clerk_id=clerk_user_id)
         db.add(user)
         db.flush()
         return user
-
-    if email and not user.email:
-        user.email = email
-    if name and not user.name:
-        user.name = name
     return user
 
 
@@ -327,7 +316,7 @@ def create_session(
     current_user_id: str = Depends(get_sessions_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> SessionCreateResponse:
-    user = _get_or_create_user(db, current_user_id, None, None)
+    user = _get_or_create_user(db, current_user_id)
     title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=422, detail="Session title cannot be empty.")
@@ -449,7 +438,7 @@ def tutor(
     current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> TutorResponse:
-    user = _get_or_create_user(db, current_user_id, None, None)
+    user = _get_or_create_user(db, current_user_id)
     question = _normalize_question(payload.question)
 
     session_id = payload.session_id
@@ -487,7 +476,7 @@ def tutor_stream(
     current_user_id: str = Depends(get_tutor_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    user = _get_or_create_user(db, current_user_id, None, None)
+    user = _get_or_create_user(db, current_user_id)
     question = _normalize_question(payload.question)
     db.commit()
     db.refresh(user)

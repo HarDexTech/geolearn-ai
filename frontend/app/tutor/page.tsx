@@ -36,8 +36,6 @@ type PersistedTutorState = {
   sessionMessagesCache: SessionMessagesCache;
 };
 
-let tutorRuntimeCache: PersistedTutorState | null = null;
-
 export default function TutorPage() {
   const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
@@ -59,6 +57,10 @@ export default function TutorPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const storageKey = useMemo(
+    () => (user?.id ? `tutor-page-state:${user.id}` : null),
+    [user?.id],
+  );
 
   const canSend = useMemo(
     () => prompt.trim().length > 2 && !loadingSend,
@@ -121,17 +123,34 @@ export default function TutorPage() {
       }
     };
 
-    const hydrateFromMemory = (): boolean => {
-      if (!tutorRuntimeCache || tutorRuntimeCache.userId !== user.id) {
+    const hydrateFromStorage = (): boolean => {
+      if (!storageKey) {
         return false;
       }
 
-      if (!tutorRuntimeCache.hasFetchedSessions) {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) {
         return false;
       }
 
-      setSessions(tutorRuntimeCache.sessions);
-      setSessionMessagesCache(tutorRuntimeCache.sessionMessagesCache);
+      try {
+        const parsed = JSON.parse(raw) as Partial<PersistedTutorState>;
+        if (parsed.userId !== user.id || !parsed.hasFetchedSessions) {
+          return false;
+        }
+
+        setSessions(Array.isArray(parsed.sessions) ? parsed.sessions : []);
+        setSessionMessagesCache(
+          parsed.sessionMessagesCache &&
+            typeof parsed.sessionMessagesCache === "object"
+            ? (parsed.sessionMessagesCache as SessionMessagesCache)
+            : {},
+        );
+      } catch {
+        window.sessionStorage.removeItem(storageKey);
+        return false;
+      }
+
       // Always enter tutor page in "new chat" mode.
       setActiveSessionId(null);
       setMessages([]);
@@ -143,7 +162,7 @@ export default function TutorPage() {
       return true;
     };
 
-    if (hydrateFromMemory()) {
+    if (hydrateFromStorage()) {
       return () => {
         active = false;
       };
@@ -154,7 +173,7 @@ export default function TutorPage() {
     return () => {
       active = false;
     };
-  }, [getAuthTokenOrThrow, isLoaded, user?.id]);
+  }, [getAuthTokenOrThrow, isLoaded, user?.id, storageKey]);
 
   useEffect(() => {
     if (activeSessionId === null) {
@@ -171,11 +190,11 @@ export default function TutorPage() {
   }, [activeSessionId, messages]);
 
   useEffect(() => {
-    if (!isLoaded || !user?.id) {
+    if (!isLoaded || !user?.id || !storageKey) {
       return;
     }
 
-    tutorRuntimeCache = {
+    const payload: PersistedTutorState = {
       userId: user.id,
       hasFetchedSessions,
       sessions,
@@ -183,9 +202,11 @@ export default function TutorPage() {
       messages,
       sessionMessagesCache,
     };
+    window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
   }, [
     isLoaded,
     user?.id,
+    storageKey,
     hasFetchedSessions,
     sessions,
     activeSessionId,
@@ -265,7 +286,9 @@ export default function TutorPage() {
       await navigator.clipboard.writeText(value);
       setCopiedMessageId(messageId);
       window.setTimeout(() => {
-        setCopiedMessageId((current) => (current === messageId ? null : current));
+        setCopiedMessageId((current) =>
+          current === messageId ? null : current,
+        );
       }, 1500);
     } catch {
       setError("Unable to copy response right now.");
@@ -329,8 +352,6 @@ export default function TutorPage() {
         const created = await createSession(
           {
             title,
-            email: user.primaryEmailAddress?.emailAddress,
-            name: user.fullName ?? undefined,
           },
           token,
         );
@@ -364,8 +385,6 @@ export default function TutorPage() {
       await askTutorStream(
         {
           question,
-          email: user.primaryEmailAddress?.emailAddress,
-          name: user.fullName ?? undefined,
           session_id: sessionId,
         },
         token,
@@ -422,7 +441,7 @@ export default function TutorPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
         <Link href="/" className="text-3xl font-black tracking-tight">
           GeoLearn AI
@@ -430,7 +449,7 @@ export default function TutorPage() {
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
           <Link href="/datasets">Datasets</Link>
-          <span className="border-b-2 border-[var(--color-primary)] pb-1 text-slate-900">
+          <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             Tutor
           </span>
           <Link href="/about">About</Link>
@@ -440,7 +459,7 @@ export default function TutorPage() {
             type="button"
             data-mobile-nav-toggle
             onClick={() => setMobileNavOpen((prev) => !prev)}
-            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+            className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
             aria-label="Toggle navigation menu"
           >
             ☰
@@ -453,7 +472,7 @@ export default function TutorPage() {
         <div className="mx-auto w-full max-w-7xl px-6 pb-2 md:hidden">
           <nav
             data-mobile-nav
-            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+            className="rounded-xl border border-(--color-border) bg-white p-2 shadow-sm"
           >
             <Link
               href="/"
@@ -491,7 +510,7 @@ export default function TutorPage() {
         <button
           type="button"
           onClick={() => setSidebarOpen((prev) => !prev)}
-          className="rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+          className="rounded-md border border-(--color-border) bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm"
           aria-label="Toggle chat history sidebar"
         >
           ☰ Chat History
@@ -509,14 +528,14 @@ export default function TutorPage() {
         ) : null}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto border-r border-[var(--color-border)] bg-white p-4 transition-transform duration-300 lg:static lg:w-auto lg:rounded-2xl lg:border lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-70 overflow-y-auto border-r border-(--color-border) bg-white p-4 transition-transform duration-300 lg:static lg:w-auto lg:rounded-2xl lg:border lg:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
           <button
             type="button"
             onClick={startNewChat}
-            className="w-full rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+            className="w-full rounded-lg bg-(--color-primary) px-3 py-2 text-sm font-semibold text-white"
           >
             New Chat
           </button>
@@ -533,8 +552,8 @@ export default function TutorPage() {
                 data-session-menu
                 className={`flex items-center gap-2 rounded-lg border p-2 ${
                   activeSessionId === session.id
-                    ? "border-[var(--color-primary)] bg-emerald-50"
-                    : "border-[var(--color-border)] bg-slate-50"
+                    ? "border-(--color-primary) bg-emerald-50"
+                    : "border-(--color-border) bg-slate-50"
                 }`}
               >
                 <button
@@ -558,7 +577,7 @@ export default function TutorPage() {
                     ⋯
                   </button>
                   {openMenuId === session.id ? (
-                    <div className="absolute right-0 top-9 z-[70] w-28 rounded-lg border border-[var(--color-border)] bg-white p-1 shadow-lg">
+                    <div className="absolute right-0 top-9 z-70 w-28 rounded-lg border border-(--color-border) bg-white p-1 shadow-lg">
                       <button
                         type="button"
                         onClick={() => void handleDeleteSession(session.id)}
@@ -575,7 +594,7 @@ export default function TutorPage() {
           </div>
         </aside>
 
-        <div className="relative rounded-2xl border border-[var(--color-border)] bg-white p-4">
+        <div className="relative rounded-2xl border border-(--color-border) bg-white p-4">
           <div className="h-[68vh] space-y-5 overflow-y-auto rounded-xl bg-slate-50 p-4">
             {loadingMessages ? (
               <p className="text-sm text-slate-500">Loading messages...</p>
@@ -589,9 +608,9 @@ export default function TutorPage() {
             {messages.map((message) => (
               <article
                 key={message.id}
-                className="space-y-3 rounded-xl border border-[var(--color-border)] bg-white p-4"
+                className="space-y-3 rounded-xl border border-(--color-border) bg-white p-4"
               >
-                <div className="rounded-lg bg-[var(--color-primary)] p-3 text-sm text-white">
+                <div className="rounded-lg bg-(--color-primary) p-3 text-sm text-white">
                   {message.question}
                 </div>
                 <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-700 prose-p:my-2 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']">
@@ -614,7 +633,7 @@ export default function TutorPage() {
                           href={video.video_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-lg border border-[var(--color-border)] p-2"
+                          className="rounded-lg border border-(--color-border) p-2"
                         >
                           {video.thumbnail ? (
                             <Image
@@ -641,9 +660,11 @@ export default function TutorPage() {
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"
-                    onClick={() => void handleCopyResponse(message.id, message.answer)}
+                    onClick={() =>
+                      void handleCopyResponse(message.id, message.answer)
+                    }
                     disabled={!message.answer.trim()}
-                    className="rounded-md border border-[var(--color-border)] bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-md border border-(--color-border) bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {copiedMessageId === message.id ? "Copied" : "Copy"}
                   </button>
@@ -652,7 +673,7 @@ export default function TutorPage() {
             ))}
           </div>
 
-          <div className="mt-4 flex gap-2 rounded-xl border border-[var(--color-border)] bg-slate-100 p-2">
+          <div className="mt-4 flex gap-2 rounded-xl border border-(--color-border) bg-slate-100 p-2">
             <input
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
@@ -668,7 +689,7 @@ export default function TutorPage() {
               type="button"
               onClick={() => void handleSend()}
               disabled={!canSend}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               Send
             </button>

@@ -95,8 +95,6 @@ export default function DashboardPage() {
       await askTutorStream(
         {
           question: prompt,
-          email: user?.primaryEmailAddress?.emailAddress,
-          name: user?.fullName ?? undefined,
         },
         token,
         (event) => {

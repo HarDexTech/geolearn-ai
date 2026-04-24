@@ -70,14 +70,14 @@ export default function DatasetsPage() {
   }, [datasets, sourceFilter]);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
         <Link href="/" className="text-3xl font-black tracking-tight">
           GeoLearn AI
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
-          <span className="border-b-2 border-[var(--color-primary)] pb-1 text-slate-900">
+          <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             Datasets
           </span>
           <Link href="/tutor">Tutor</Link>
@@ -88,7 +88,7 @@ export default function DatasetsPage() {
             type="button"
             data-mobile-nav-toggle
             onClick={() => setMobileNavOpen((prev) => !prev)}
-            className="rounded-md border border-[var(--color-border)] px-3 py-2 text-xl leading-none md:hidden"
+            className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
             aria-label="Toggle navigation menu"
           >
             ☰
@@ -101,7 +101,7 @@ export default function DatasetsPage() {
         <div className="mx-auto w-full max-w-7xl px-6 pb-2 md:hidden">
           <nav
             data-mobile-nav
-            className="rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm"
+            className="rounded-xl border border-(--color-border) bg-white p-2 shadow-sm"
           >
             <Link
               href="/"
@@ -144,18 +144,18 @@ export default function DatasetsPage() {
           workflow.
         </p>
 
-        <div className="mt-8 rounded-2xl border border-[var(--color-border)] bg-white p-4">
+        <div className="mt-8 rounded-2xl border border-(--color-border) bg-white p-4">
           <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search by dataset name, description, or source"
-              className="rounded-xl border border-[var(--color-border)] bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[var(--color-primary)]"
+              className="rounded-xl border border-(--color-border) bg-slate-50 px-4 py-3 text-sm outline-none focus:border-(--color-primary)"
             />
             <select
               value={sourceFilter}
               onChange={(event) => setSourceFilter(event.target.value)}
-              className="rounded-xl border border-[var(--color-border)] bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[var(--color-primary)]"
+              className="rounded-xl border border-(--color-border) bg-slate-50 px-4 py-3 text-sm outline-none focus:border-(--color-primary)"
             >
               {sources.map((source) => (
                 <option key={source} value={source}>
@@ -173,7 +173,7 @@ export default function DatasetsPage() {
                 onClick={() => setCategory(item)}
                 className={`rounded-full px-4 py-2 text-xs font-semibold capitalize ${
                   category === item
-                    ? 'bg-[var(--color-primary)] text-white'
+                    ? 'bg-(--color-primary) text-white'
                     : 'bg-emerald-100 text-emerald-900'
                 }`}
               >
@@ -191,7 +191,7 @@ export default function DatasetsPage() {
           {visible.map((dataset) => (
             <article
               key={dataset.id}
-              className="rounded-2xl border border-[var(--color-border)] bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-(--color-border) bg-white p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-900">
@@ -209,7 +209,7 @@ export default function DatasetsPage() {
                 href={dataset.download_url}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-5 inline-flex rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
+                className="mt-5 inline-flex rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white"
               >
                 Download Dataset
               </a>
