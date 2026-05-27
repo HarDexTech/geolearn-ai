@@ -1,14 +1,31 @@
-import os
 import logging
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from database import Base, engine
-from routers import datasets, tutor, youtube
+from routers import datasets, tutor
 
-app = FastAPI(title="GeoLearn AI API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        Base.metadata.create_all(bind=engine)
+        _ensure_session_schema()
+    except Exception as exc:
+        if db_startup_strict:
+            logging.exception("Startup DB init failed; refusing to start.")
+            raise RuntimeError("Database initialization failed") from exc
+
+        logging.exception(
+            "Startup DB init failed; continuing because DB_STARTUP_STRICT is disabled."
+        )
+    yield
+
+
+app = FastAPI(title="GeoLearn AI API", lifespan=lifespan)
 
 frontend_origin = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "http://localhost:3000")
 environment = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")).lower()
@@ -82,19 +99,6 @@ def _ensure_session_schema() -> None:
             )
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    try:
-        Base.metadata.create_all(bind=engine)
-        _ensure_session_schema()
-    except Exception as exc:
-        if db_startup_strict:
-            logging.exception("Startup DB init failed; refusing to start.")
-            raise RuntimeError("Database initialization failed") from exc
-
-        logging.exception("Startup DB init failed; continuing because DB_STARTUP_STRICT is disabled.")
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -102,4 +106,3 @@ def health() -> dict[str, str]:
 
 app.include_router(tutor.router)
 app.include_router(datasets.router)
-app.include_router(youtube.router)
