@@ -8,6 +8,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { askTutorStream, getYoutubeVideos, YoutubeVideo } from "@/lib/api";
+import { useScrollAnimate } from "@/hooks/useScrollAnimate";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 type Message = {
   id: string;
@@ -25,6 +27,8 @@ export default function DashboardPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const { ref: cardRef, visible: cardVisible } = useScrollAnimate(0.15);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const canSend = useMemo(
     () => question.trim().length > 2 && !loadingTutor,
@@ -41,7 +45,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
+      if (!(event.target instanceof Element)) return;
+      const target = event.target as Element;
       if (
         !target.closest("[data-mobile-nav]") &&
         !target.closest("[data-mobile-nav-toggle]")
@@ -157,7 +162,9 @@ export default function DashboardPage() {
       await navigator.clipboard.writeText(value);
       setCopiedMessageId(messageId);
       window.setTimeout(() => {
-        setCopiedMessageId((current) => (current === messageId ? null : current));
+        setCopiedMessageId((current) =>
+          current === messageId ? null : current,
+        );
       }, 1500);
     } catch {
       setError("Unable to copy response right now.");
@@ -166,7 +173,9 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
+      <header className={`mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5 ${
+        prefersReducedMotion ? "" : "animate__animated animate__fadeInDown animate__fast"
+      }`}>
         <Link href="/" className="text-3xl font-black tracking-tight">
           GeoLearn AI
         </Link>
@@ -229,7 +238,14 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="mx-auto w-full max-w-4xl px-6 pb-8">
-        <div className="rounded-2xl border border-(--color-border) bg-white p-5">
+        <div
+          ref={cardRef}
+          className={`rounded-2xl border border-(--color-border) bg-white p-5 transition-opacity duration-500 ${
+            cardVisible
+              ? "animate__animated animate__fadeInUp animate__fast opacity-100"
+              : "opacity-0"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">AI GIS Tutor</h2>
@@ -257,9 +273,11 @@ export default function DashboardPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={
+                className={`${
+                  prefersReducedMotion ? "" : "animate__animated animate__fadeInUp animate__fast"
+                } ${
                   message.role === "user" ? "ml-auto w-[85%]" : "w-[92%]"
-                }
+                }`}
               >
                 <div
                   className={`rounded-xl p-4 text-sm leading-7 ${
@@ -283,7 +301,9 @@ export default function DashboardPage() {
                 </div>
 
                 {message.role === "assistant" && message.videos?.length ? (
-                  <div className="mt-3 rounded-xl border border-(--color-border) bg-white p-3">
+                  <div className={`mt-3 rounded-xl border border-(--color-border) bg-white p-3 ${
+                    prefersReducedMotion ? "" : "animate__animated animate__fadeInUp animate__fast"
+                  }`}>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                       Recommended Tutorials
                     </p>
@@ -352,7 +372,9 @@ export default function DashboardPage() {
               type="button"
               disabled={!canSend}
               onClick={() => void handleAsk()}
-              className="rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className={`rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                canSend && !prefersReducedMotion ? "animate__animated animate__pulse" : ""
+              }`}
             >
               Send
             </button>
