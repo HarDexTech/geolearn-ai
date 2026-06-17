@@ -3,10 +3,15 @@ from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
 
-client = AsyncOpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com",
-)
+
+def _get_client() -> AsyncOpenAI:
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        api_key = "sk-placeholder"
+    return AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://api.deepseek.com",
+    )
 
 MODELS = {
     "agent": "deepseek-chat",
@@ -30,6 +35,7 @@ async def chat_stream(
     task_type: str = "fast",
 ) -> AsyncGenerator[str, None]:
     model = MODELS.get(task_type, MODELS["fast"])
+    client = _get_client()
     stream = await client.chat.completions.create(
         model=model,
         messages=messages,
@@ -48,6 +54,7 @@ async def chat_complete(
     task_type: str = "fast",
 ) -> str:
     model = MODELS.get(task_type, MODELS["fast"])
+    client = _get_client()
     response = await client.chat.completions.create(
         model=model,
         messages=messages,
