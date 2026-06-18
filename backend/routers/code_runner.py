@@ -36,7 +36,8 @@ async def run_code(
     for layer in workspace.layers:
         if layer.file_url and layer.visible:
             var_name = layer.name.lower().replace(" ", "_").replace("-", "_")
-            input_files[var_name] = layer.file_url
+            if var_name.isidentifier():
+                input_files[var_name] = layer.file_url
 
     result = sandbox_execute(payload.code, input_files, payload.timeout)
 

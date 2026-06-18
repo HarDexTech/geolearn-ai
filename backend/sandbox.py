@@ -61,7 +61,7 @@ def _find_violation(code: str) -> str | None:
                     return f"Blocked module: '{node.module}'"
 
         elif isinstance(node, ast.Name):
-            if node.id in _BLOCKED_NAMES:
+            if node.id in _BLOCKED_NAMES or node.id in _BLOCKED_MODULES:
                 return f"Blocked name: '{node.id}'"
 
         elif isinstance(node, ast.Attribute):
@@ -92,6 +92,7 @@ def execute(code: str, input_files: dict[str, str], timeout: int = 30) -> Execut
 
     exec_id = uuid.uuid4().hex
     output_dir = f"/tmp/geo_output/{exec_id}"
+    os.makedirs(output_dir, exist_ok=True)
 
     preamble_lines = [
         "import rasterio",
@@ -101,12 +102,12 @@ def execute(code: str, input_files: dict[str, str], timeout: int = 30) -> Execut
         "matplotlib.use('Agg')",
         "import matplotlib.pyplot as plt",
         "import json",
-        "import os",
         f"OUTPUT_DIR = '{output_dir}'",
-        "os.makedirs(OUTPUT_DIR, exist_ok=True)",
     ]
 
     for var_name, file_path in input_files.items():
+        if not var_name.isidentifier():
+            continue
         preamble_lines.append(f"{var_name} = {file_path!r}")
 
     preamble = "\n".join(preamble_lines) + "\n"
