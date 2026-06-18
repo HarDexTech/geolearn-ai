@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth import get_current_user_id
+from auth import get_code_user_id_with_rate_limit
 from database import get_db
 from models import Execution, Project, User, Workspace
 from sandbox import execute as sandbox_execute
@@ -13,13 +13,13 @@ router = APIRouter(prefix="/api/code", tags=["code"])
 class RunRequest(BaseModel):
     workspace_id: int
     code: str = Field(max_length=50_000)
-    timeout: int = Field(default=30, le=60)
+    timeout: int = Field(default=30, ge=1, le=60)
 
 
-@router.post("/run")
-async def run_code(
+@router.post("/run", responses={429: {"description": "Too many code execution requests"}})
+def run_code(
     payload: RunRequest,
-    current_user_id: str = Depends(get_current_user_id),
+    current_user_id: str = Depends(get_code_user_id_with_rate_limit),
     db: Session = Depends(get_db),
 ):
     workspace = (

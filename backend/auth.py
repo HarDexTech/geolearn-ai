@@ -44,10 +44,14 @@ _SESSIONS_RATE_LIMIT_MESSAGE = "Too many session requests. Please try again in a
 _YOUTUBE_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("YOUTUBE_RATE_LIMIT_MAX_REQUESTS", "20"))
 _YOUTUBE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("YOUTUBE_RATE_LIMIT_WINDOW_SECONDS", "60"))
 _YOUTUBE_RATE_LIMIT_MESSAGE = "Too many video requests. Please try again in a minute."
+_CODE_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("CODE_RATE_LIMIT_MAX_REQUESTS", "5"))
+_CODE_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CODE_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_CODE_RATE_LIMIT_MESSAGE = "Too many code execution requests. Please try again in a minute."
 _REDIS_URL = os.getenv("REDIS_URL", "").strip()
 _REDIS_TUTOR_RATE_LIMIT_PREFIX = os.getenv("REDIS_TUTOR_RATE_LIMIT_PREFIX", "ratelimit:tutor")
 _REDIS_SESSIONS_RATE_LIMIT_PREFIX = os.getenv("REDIS_SESSIONS_RATE_LIMIT_PREFIX", "ratelimit:sessions")
 _REDIS_YOUTUBE_RATE_LIMIT_PREFIX = os.getenv("REDIS_YOUTUBE_RATE_LIMIT_PREFIX", "ratelimit:youtube")
+_REDIS_CODE_RATE_LIMIT_PREFIX = os.getenv("REDIS_CODE_RATE_LIMIT_PREFIX", "ratelimit:code")
 _REDIS_UNAVAILABLE_MESSAGE = "Rate limiter backend unavailable. Please try again shortly."
 
 
@@ -63,9 +67,11 @@ _RATE_LIMIT_REDIS_STRICT = _is_truthy(
 _tutor_rate_limit_bucket: dict[str, list[float]] = {}
 _sessions_rate_limit_bucket: dict[str, list[float]] = {}
 _youtube_rate_limit_bucket: dict[str, list[float]] = {}
+_code_rate_limit_bucket: dict[str, list[float]] = {}
 _tutor_rate_limit_lock = threading.Lock()
 _sessions_rate_limit_lock = threading.Lock()
 _youtube_rate_limit_lock = threading.Lock()
+_code_rate_limit_lock = threading.Lock()
 
 _redis_client: Any = None
 _redis_client_lock = threading.Lock()
@@ -360,6 +366,32 @@ async def get_sessions_user_id_with_rate_limit(
         _SESSIONS_RATE_LIMIT_MAX_REQUESTS,
         _SESSIONS_RATE_LIMIT_WINDOW_SECONDS,
         _SESSIONS_RATE_LIMIT_MESSAGE,
+    )
+
+    return current_user_id
+
+
+async def get_code_user_id_with_rate_limit(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    if _REDIS_URL:
+        enforced_with_redis = _enforce_rate_limit_with_redis(
+            current_user_id,
+            _REDIS_CODE_RATE_LIMIT_PREFIX,
+            _CODE_RATE_LIMIT_MAX_REQUESTS,
+            _CODE_RATE_LIMIT_WINDOW_SECONDS,
+            _CODE_RATE_LIMIT_MESSAGE,
+        )
+        if enforced_with_redis:
+            return current_user_id
+
+    _enforce_rate_limit_in_memory(
+        current_user_id,
+        _code_rate_limit_bucket,
+        _code_rate_limit_lock,
+        _CODE_RATE_LIMIT_MAX_REQUESTS,
+        _CODE_RATE_LIMIT_WINDOW_SECONDS,
+        _CODE_RATE_LIMIT_MESSAGE,
     )
 
     return current_user_id
