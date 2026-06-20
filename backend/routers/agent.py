@@ -82,10 +82,11 @@ async def run_agent(
     history = (
         db.query(Conversation)
         .filter(Conversation.workspace_id == workspace.id)
-        .order_by(Conversation.created_at.asc())
+        .order_by(Conversation.created_at.desc())
         .limit(20)
         .all()
     )
+    history = list(reversed(history))
 
     messages = _build_messages(workspace, history, payload.message)
 
