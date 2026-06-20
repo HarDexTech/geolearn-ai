@@ -1,3 +1,6 @@
 *.db
 *.png
 ENV_SETUP.md
+
+__pycache__/
+*.pyc

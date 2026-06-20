@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pystac_client import Client as StacClient
 import planetary_computer
 
-from auth import get_current_user_id
+from auth import get_data_user_id_with_rate_limit
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
@@ -119,13 +119,13 @@ def _search_grid3(query: str) -> list[dict]:
     return matched
 
 
-@router.get("/search")
+@router.get("/search", responses={429: {"description": "Too many data search requests"}})
 async def search_data(
     q: str = Query(min_length=1, max_length=200),
     bbox: str = Query(default="2.6,4.2,14.7,13.9"),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
-    _current_user_id: str = Depends(get_current_user_id),
+    _current_user_id: str = Depends(get_data_user_id_with_rate_limit),
 ):
     try:
         parts = [float(x) for x in bbox.split(",")]
