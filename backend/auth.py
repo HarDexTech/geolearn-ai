@@ -50,12 +50,16 @@ _CODE_RATE_LIMIT_MESSAGE = "Too many code execution requests. Please try again i
 _DATA_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("DATA_RATE_LIMIT_MAX_REQUESTS", "20"))
 _DATA_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("DATA_RATE_LIMIT_WINDOW_SECONDS", "60"))
 _DATA_RATE_LIMIT_MESSAGE = "Too many data search requests. Please try again in a minute."
+_AGENT_RATE_LIMIT_MAX_REQUESTS = int(os.getenv("AGENT_RATE_LIMIT_MAX_REQUESTS", "8"))
+_AGENT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("AGENT_RATE_LIMIT_WINDOW_SECONDS", "60"))
+_AGENT_RATE_LIMIT_MESSAGE = "Too many agent requests. Please try again in a minute."
 _REDIS_URL = os.getenv("REDIS_URL", "").strip()
 _REDIS_TUTOR_RATE_LIMIT_PREFIX = os.getenv("REDIS_TUTOR_RATE_LIMIT_PREFIX", "ratelimit:tutor")
 _REDIS_SESSIONS_RATE_LIMIT_PREFIX = os.getenv("REDIS_SESSIONS_RATE_LIMIT_PREFIX", "ratelimit:sessions")
 _REDIS_YOUTUBE_RATE_LIMIT_PREFIX = os.getenv("REDIS_YOUTUBE_RATE_LIMIT_PREFIX", "ratelimit:youtube")
 _REDIS_CODE_RATE_LIMIT_PREFIX = os.getenv("REDIS_CODE_RATE_LIMIT_PREFIX", "ratelimit:code")
 _REDIS_DATA_RATE_LIMIT_PREFIX = os.getenv("REDIS_DATA_RATE_LIMIT_PREFIX", "ratelimit:data")
+_REDIS_AGENT_RATE_LIMIT_PREFIX = os.getenv("REDIS_AGENT_RATE_LIMIT_PREFIX", "ratelimit:agent")
 _REDIS_UNAVAILABLE_MESSAGE = "Rate limiter backend unavailable. Please try again shortly."
 
 
@@ -73,11 +77,13 @@ _sessions_rate_limit_bucket: dict[str, list[float]] = {}
 _youtube_rate_limit_bucket: dict[str, list[float]] = {}
 _code_rate_limit_bucket: dict[str, list[float]] = {}
 _data_rate_limit_bucket: dict[str, list[float]] = {}
+_agent_rate_limit_bucket: dict[str, list[float]] = {}
 _tutor_rate_limit_lock = threading.Lock()
 _sessions_rate_limit_lock = threading.Lock()
 _youtube_rate_limit_lock = threading.Lock()
 _code_rate_limit_lock = threading.Lock()
 _data_rate_limit_lock = threading.Lock()
+_agent_rate_limit_lock = threading.Lock()
 
 _redis_client: Any = None
 _redis_client_lock = threading.Lock()
@@ -424,6 +430,32 @@ async def get_data_user_id_with_rate_limit(
         _DATA_RATE_LIMIT_MAX_REQUESTS,
         _DATA_RATE_LIMIT_WINDOW_SECONDS,
         _DATA_RATE_LIMIT_MESSAGE,
+    )
+
+    return current_user_id
+
+
+async def get_agent_user_id_with_rate_limit(
+    current_user_id: str = Depends(get_current_user_id),
+) -> str:
+    if _REDIS_URL:
+        enforced_with_redis = _enforce_rate_limit_with_redis(
+            current_user_id,
+            _REDIS_AGENT_RATE_LIMIT_PREFIX,
+            _AGENT_RATE_LIMIT_MAX_REQUESTS,
+            _AGENT_RATE_LIMIT_WINDOW_SECONDS,
+            _AGENT_RATE_LIMIT_MESSAGE,
+        )
+        if enforced_with_redis:
+            return current_user_id
+
+    _enforce_rate_limit_in_memory(
+        current_user_id,
+        _agent_rate_limit_bucket,
+        _agent_rate_limit_lock,
+        _AGENT_RATE_LIMIT_MAX_REQUESTS,
+        _AGENT_RATE_LIMIT_WINDOW_SECONDS,
+        _AGENT_RATE_LIMIT_MESSAGE,
     )
 
     return current_user_id
