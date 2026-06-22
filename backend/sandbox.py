@@ -1,5 +1,6 @@
 import ast
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -106,7 +107,7 @@ def execute(code: str, input_files: dict[str, str], timeout: int = 30) -> Execut
     ]
 
     for var_name, file_path in input_files.items():
-        if not var_name.isidentifier():
+        if not var_name.isidentifier() or var_name.startswith("__"):
             continue
         preamble_lines.append(f"{var_name} = {file_path!r}")
 
@@ -160,6 +161,7 @@ def execute(code: str, input_files: dict[str, str], timeout: int = 30) -> Execut
         for root, _dirs, files in os.walk(output_dir):
             for file in files:
                 output_files.append(os.path.join(root, file))
+    shutil.rmtree(output_dir, ignore_errors=True)
 
     return ExecutionResult(
         stdout=stdout,

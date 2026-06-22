@@ -15,6 +15,8 @@ from sandbox import execute as sandbox_execute
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
+UNAVAILABLE_MESSAGE = "The AI agent is currently unavailable. Please try again."
+
 
 class AgentRequest(BaseModel):
     workspace_id: int
@@ -157,8 +159,8 @@ async def run_agent(
                         exec_db.close()
 
             yield _event({"type": "done"})
-        except Exception as e:
-            yield _event({"type": "error", "message": str(e)})
+        except Exception:
+            yield _event({"type": "error", "message": UNAVAILABLE_MESSAGE})
 
     return StreamingResponse(
         _stream(),
