@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from database import Base, engine
-from routers import agent, code_runner, data_connector, datasets, tutor
+from routers import agent, code_runner, data_connector, datasets, tutor, workspace
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -109,3 +109,4 @@ app.include_router(datasets.router)
 app.include_router(code_runner.router)
 app.include_router(data_connector.router)
 app.include_router(agent.router)
+app.include_router(workspace.router)
