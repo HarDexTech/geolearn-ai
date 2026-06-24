@@ -1,41 +1,38 @@
-# Session Report
+# Session Report — Frontend Workspace Feature
 
-## Routes Built
+## Files Created
 
-### `data_connector.py` — `GET /api/data/search`
-- Searches Planetary Computer (STAC) or returns 3 hardcoded Nigeria grid3 datasets
-- Rate-limited: 20 req/min
-- Verified: 8 Landsat results returned (200)
+| File | Description |
+|------|-------------|
+| `lib/workspace-store.ts` | Zustand store with Layer, Message, WorkspaceState types + all actions |
+| `components/workspace/MapView.tsx` | MapLibre GL map centered on Nigeria, layer panel overlay with visibility toggles |
+| `components/workspace/CodeEditor.tsx` | Monaco editor (Python, vs-dark), Run button calling POST /api/code/run, Editor/Terminal tab switch |
+| `components/workspace/Terminal.tsx` | Dark terminal panel with auto-scroll and Clear button |
+| `components/workspace/AiSidebar.tsx` | AI chat panel with markdown rendering, streaming SSE via runAgentStream, execution result collapsible, Ctrl+Enter send |
+| `app/workspace/page.tsx` | Projects list page with grid cards, inline new-project form, loading skeleton, empty state |
+| `app/workspace/[id]/page.tsx` | Main workspace layout (CSS grid: map top + editor/terminal bottom + 360px AI sidebar), 2s auto-save debounce |
 
-### `agent.py` — `POST /api/agent/run` (streaming SSE)
-- Builds workspace context from DB, streams AI responses, saves conversation history
-- Tier 1 unit tests: 9/9 pass (helpers work offline)
-- Rate-limited: 8 req/min
-- **Blocked**: missing `DEEPSEEK_API_KEY`
+## Files Modified
 
-### `workspace.py` — 6 CRUD endpoints (projects, workspaces, layers)
+| File | Change |
+|------|--------|
+| `lib/api.ts` | Added Layer, WorkspaceData, Project, AgentStreamEvent types + 8 workspace API functions |
+| `app/page.tsx` | CTA changed from "Explore Datasets" → "Open Workspace" pointing to /workspace; "Workspace" added to nav |
 
-| # | Test | Status |
-|---|------|--------|
-| 1 | POST /projects | 200 ✓ |
-| 2 | GET /projects | 200 ✓ |
-| 3 | GET /workspaces/{id} | 200 ✓ |
-| 4 | PATCH /workspaces/{id} | 200 ✓ |
-| 5 | POST layer | 200 ✓ |
-| 6 | GET workspace with layer | 200 ✓ |
-| 7 | DELETE layer | 200 ✓ |
-| 8 | GET workspace empty | 200 ✓ |
-| 9 | Blank name → 422 | ✓ |
-| 10 | Invalid layer_type → 422 | ✓ |
-| 11 | Nonexistent workspace → 404 | ✓ |
-| 12 | Ownership isolation → 404 | ✓ |
+## Nav Consistency Fix
 
-## Fixes Applied
+All pages now share the same nav order: **Home → Workspace → Datasets → Tutor → About**
 
-- **agent.py**: Replaced `str(e)` error leak with generic `UNAVAILABLE_MESSAGE`
-- **sandbox.py**: Added `shutil.rmtree` cleanup after output extraction
-- **sandbox.py** + **code_runner.py**: Added `__`-prefixed variable rejection
+- `app/workspace/page.tsx` — nav and mobile nav reordered (Workspace second)
+- `app/about/page.tsx` — added `UserButton` import and `<UserButton />` in header (was missing)
+- `app/tutor/page.tsx` — added Workspace to desktop + mobile nav
+- `app/datasets/page.tsx` — added Workspace to desktop + mobile nav
+- `app/dashboard/page.tsx` — added Workspace to desktop + mobile nav
 
-## Blocked
+## Auth
 
-- `DEEPSEEK_API_KEY` not funded — live AI streaming (tutor, agent) can't run
+`/workspace` and `/workspace/[id]` are already protected by the existing middleware (not in the public routes list).
+
+## Build
+
+Frontend compiles and builds with no TypeScript errors.

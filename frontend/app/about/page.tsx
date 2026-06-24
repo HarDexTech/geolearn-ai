@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { UserButton } from '@clerk/nextjs';
 
 export default function AboutPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -31,21 +32,25 @@ export default function AboutPage() {
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
+          <Link href="/workspace">Workspace</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
           <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             About
           </span>
         </nav>
-        <button
-          type="button"
-          data-mobile-nav-toggle
-          onClick={() => setMobileNavOpen((prev) => !prev)}
-          className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
-          aria-label="Toggle navigation menu"
-        >
-          ☰
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-mobile-nav-toggle
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            className="rounded-md border border-(--color-border) px-3 py-2 text-xl leading-none md:hidden"
+            aria-label="Toggle navigation menu"
+          >
+            ☰
+          </button>
+          <UserButton />
+        </div>
       </header>
 
       {mobileNavOpen ? (
@@ -60,6 +65,13 @@ export default function AboutPage() {
               className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Home
+            </Link>
+            <Link
+              href="/workspace"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Workspace
             </Link>
             <Link
               href="/datasets"

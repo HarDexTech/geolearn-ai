@@ -448,6 +448,7 @@ export default function TutorPage() {
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
+          <Link href="/workspace">Workspace</Link>
           <Link href="/datasets">Datasets</Link>
           <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             Tutor
@@ -480,6 +481,13 @@ export default function TutorPage() {
               className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Home
+            </Link>
+            <Link
+              href="/workspace"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Workspace
             </Link>
             <Link
               href="/datasets"

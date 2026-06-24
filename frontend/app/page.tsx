@@ -17,6 +17,7 @@ export default function Home() {
           >
             Home
           </Link>
+          <Link href="/workspace">Workspace</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
           <Link href="/about">About</Link>
@@ -46,10 +47,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
-              href="/datasets"
+              href="/workspace"
               className="rounded-lg bg-(--color-primary) px-6 py-3 font-semibold text-white shadow-sm transition-transform duration-300 hover:scale-[1.02] hover:bg-opacity-50"
             >
-              Explore Datasets
+              Open Workspace
             </Link>
             <Link
               href="/tutor"

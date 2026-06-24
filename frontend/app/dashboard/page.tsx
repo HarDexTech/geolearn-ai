@@ -174,6 +174,7 @@ export default function DashboardPage() {
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-700 md:flex">
           <Link href="/">Home</Link>
+          <Link href="/workspace">Workspace</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
           <Link href="/about">About</Link>
@@ -204,6 +205,13 @@ export default function DashboardPage() {
               className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Home
+            </Link>
+            <Link
+              href="/workspace"
+              onClick={() => setMobileNavOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Workspace
             </Link>
             <Link
               href="/datasets"
