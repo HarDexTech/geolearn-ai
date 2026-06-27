@@ -85,6 +85,7 @@ def _serialize_workspace(workspace: Workspace) -> dict:
     return {
         "id": workspace.id,
         "project_id": workspace.project_id,
+        "project_name": workspace.project.name,
         "code": workspace.code,
         "map_state": workspace.map_state,
         "updated_at": workspace.updated_at.isoformat(),

@@ -53,9 +53,8 @@ export default function WorkspacePage() {
         const data = await getWorkspace(workspaceIdNum, token);
         setWorkspaceId(data.id);
         setCode(data.code ?? "");
-        data.layers.forEach((layer) =>
-          addLayer({ ...layer, visible: true }),
-        );
+        if (data.project_name) setProjectName(data.project_name);
+        data.layers.forEach((layer) => addLayer(layer));
       } catch {
         router.push("/workspace");
       }

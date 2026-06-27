@@ -51,6 +51,7 @@ export type Layer = {
 export type WorkspaceData = {
   id: number;
   project_id: number;
+  project_name: string;
   code: string | null;
   map_state: object | null;
   layers: Layer[];
