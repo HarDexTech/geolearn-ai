@@ -81,6 +81,8 @@ export type AgentStreamEvent =
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function request<T>(
   path: string,
   init?: RequestInit,
@@ -95,26 +97,39 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  if (!response.ok) {
-    let errorMessage = `Request failed with status ${response.status}`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        errorMessage = payload.detail;
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage = `Request failed with status ${response.status}`;
+      try {
+        const payload = (await response.json()) as { detail?: string };
+        if (payload.detail) {
+          errorMessage = payload.detail;
+        }
+      } catch {
+        // Ignore JSON parsing errors and return generic message.
       }
-    } catch {
-      // Ignore JSON parsing errors and return generic message.
+      throw new Error(errorMessage);
     }
-    throw new Error(errorMessage);
-  }
 
-  return response.json() as Promise<T>;
+    return response.json() as Promise<T>;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out.");
+    }
+    throw err;
+  }
 }
 
 export async function getDatasets(params?: {

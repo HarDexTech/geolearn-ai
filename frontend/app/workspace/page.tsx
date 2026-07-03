@@ -26,7 +26,9 @@ export default function WorkspacePage() {
       const result = await getProjects(token);
       setProjects(result.projects);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load projects.");
+      const msg = err instanceof Error ? err.message : "Failed to load projects.";
+      console.error("[Workspace] Failed to fetch projects:", err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -190,8 +192,15 @@ export default function WorkspacePage() {
         ) : null}
 
         {error ? (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {error}
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void fetchProjects()}
+              className="ml-3 rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              Retry
+            </button>
           </div>
         ) : null}
 
