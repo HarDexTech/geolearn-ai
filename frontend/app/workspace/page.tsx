@@ -15,6 +15,7 @@ export default function WorkspacePage() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [openingProjectId, setOpeningProjectId] = useState<number | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const fetchProjects = useCallback(async () => {
@@ -64,6 +65,15 @@ export default function WorkspacePage() {
       const project = await createProject({ name }, token);
       setShowNewForm(false);
       setNewName("");
+      setProjects((prev) => [
+        {
+          id: project.id,
+          name: project.name,
+          workspace_id: project.workspace_id,
+          created_at: project.created_at,
+        },
+        ...prev,
+      ]);
       router.push(`/workspace/${project.workspace_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project.");
@@ -71,6 +81,13 @@ export default function WorkspacePage() {
       setCreating(false);
     }
   }
+
+  async function handleOpen(workspaceId: number) {
+    setOpeningProjectId(workspaceId);
+    router.push(`/workspace/${workspaceId}`);
+  }
+
+  const isDisabled = openingProjectId !== null;
 
   return (
     <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
@@ -152,7 +169,8 @@ export default function WorkspacePage() {
           <button
             type="button"
             onClick={() => setShowNewForm((prev) => !prev)}
-            className="rounded-lg bg-(--color-primary) px-5 py-2 text-sm font-semibold text-white"
+            disabled={isDisabled}
+            className="rounded-lg bg-(--color-primary) px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             New Project
           </button>
@@ -169,11 +187,12 @@ export default function WorkspacePage() {
               placeholder="Project name..."
               className="flex-1 rounded-lg border border-(--color-border) px-3 py-2 text-sm outline-none focus:border-(--color-primary)"
               autoFocus
+              disabled={isDisabled}
             />
             <button
               type="button"
               onClick={() => void handleCreate()}
-              disabled={creating || !newName.trim()}
+              disabled={creating || isDisabled || !newName.trim()}
               className="rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create"}
@@ -234,12 +253,18 @@ export default function WorkspacePage() {
                 <p className="mt-1 text-xs text-slate-500">
                   Created {new Date(project.created_at).toLocaleDateString()}
                 </p>
-                <Link
-                  href={`/workspace/${project.workspace_id}`}
-                  className="mt-4 inline-block rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white"
+                <button
+                  type="button"
+                  onClick={() => void handleOpen(project.workspace_id)}
+                  disabled={isDisabled}
+                  className={`mt-4 inline-block rounded-lg bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                    openingProjectId === project.workspace_id ? "opacity-50" : ""
+                  }`}
                 >
-                  Open
-                </Link>
+                  {openingProjectId === project.workspace_id
+                    ? "Opening..."
+                    : "Open"}
+                </button>
               </div>
             ))}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -27,6 +27,10 @@ export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFetchedRef = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
 
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -37,30 +41,46 @@ export default function WorkspacePage() {
   const setCode = useWorkspaceStore((s) => s.setCode);
   const addLayer = useWorkspaceStore((s) => s.addLayer);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
+  const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
 
   const workspaceIdNum = Number(params.id);
 
-  useEffect(() => {
-    if (!workspaceIdNum) return;
+  const load = useCallback(async () => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
 
-    async function load() {
-      try {
-        const token = await getToken();
-        if (!token) {
-          router.push("/sign-in");
-          return;
-        }
-        const data = await getWorkspace(workspaceIdNum, token);
-        setWorkspaceId(data.id);
-        setCode(data.code ?? "");
-        if (data.project_name) setProjectName(data.project_name);
-        data.layers.forEach((layer) => addLayer(layer));
-      } catch {
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) {
+        router.push("/sign-in");
+        return;
+      }
+      const data = await getWorkspace(workspaceIdNum, token);
+      setWorkspaceId(data.id);
+      setCode(data.code ?? "");
+      if (data.project_name) setProjectName(data.project_name);
+      data.layers.forEach((layer) => addLayer(layer));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("404")) {
         router.push("/workspace");
+      } else {
+        console.error("[Workspace] Load error:", err);
+        setError(msg || "Failed to load workspace. Check that the backend is running.");
       }
     }
+  }, [workspaceIdNum, getToken, setWorkspaceId, setCode, addLayer, setProjectName, router]);
+
+  useEffect(() => {
+    if (!workspaceIdNum) return;
+    resetWorkspace();
+    hasFetchedRef.current = false;
     void load();
-  }, [workspaceIdNum, getToken, setWorkspaceId, setCode, addLayer, router]);
+    return () => {
+      hasFetchedRef.current = false;
+    };
+  }, [workspaceIdNum, load, resetWorkspace]);
 
   useEffect(() => {
     if (!workspaceIdNum) return;
@@ -104,11 +124,12 @@ export default function WorkspacePage() {
   return (
     <main className="flex h-screen flex-col bg-(--color-bg) text-(--color-text)">
       <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-(--color-border) bg-white px-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link
             href="/workspace"
-            className="text-lg font-bold tracking-tight text-(--color-primary)"
+            className="flex items-center gap-1 text-lg font-bold tracking-tight text-(--color-primary)"
           >
+            <span aria-hidden="true">&larr;</span>
             GeoLearn AI
           </Link>
           <span className="text-sm font-semibold text-slate-500">/</span>
@@ -128,18 +149,95 @@ export default function WorkspacePage() {
         </div>
       </header>
 
+      {error ? (
+        <div className="flex items-center justify-between border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700">
+          <span>{error}</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                hasFetchedRef.current = false;
+                void load();
+              }}
+              className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/workspace")}
+              className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+            >
+              Back to Projects
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col">
           <div className="flex-1">
             <MapView />
           </div>
-          <div className="h-[45%] border-t border-(--color-border) bg-white">
-            {activeTab === "editor" ? <CodeEditor /> : <Terminal />}
+          <div className={`border-t border-(--color-border) bg-white transition-all duration-200 ${bottomPanelOpen ? 'h-[45%]' : 'h-0 overflow-hidden'}`}>
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-(--color-border) bg-slate-50 px-3 py-1 flex-shrink-0">
+                <span className="text-xs font-semibold text-slate-500">
+                  {activeTab === "editor" ? "Code Editor" : "Terminal"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBottomPanelOpen(false)}
+                  className="rounded p-1 text-sm leading-none text-slate-500 hover:bg-slate-200"
+                  aria-label="Close bottom panel"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {activeTab === "editor" ? <CodeEditor /> : <Terminal />}
+              </div>
+            </div>
           </div>
+          {!bottomPanelOpen ? (
+            <button
+              type="button"
+              onClick={() => setBottomPanelOpen(true)}
+              className="flex h-8 flex-shrink-0 items-center justify-center border-t border-(--color-border) bg-slate-50 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+              aria-label="Open bottom panel"
+            >
+              ▲ Open {activeTab === "editor" ? "Code Editor" : "Terminal"}
+            </button>
+          ) : null}
         </div>
-        <aside className="w-[360px] flex-shrink-0 border-l border-(--color-border) bg-white">
-          <AiSidebar />
-        </aside>
+
+        <div className="relative flex">
+          {sidebarOpen ? (
+            <aside className="w-[360px] flex-shrink-0 border-l border-(--color-border) bg-white">
+              <div className="flex items-center justify-between border-b border-(--color-border) px-3 py-2">
+                <span className="text-xs font-semibold text-slate-500">AI Assistant</span>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="rounded p-1 text-sm leading-none text-slate-500 hover:bg-slate-200"
+                  aria-label="Close sidebar"
+                >
+                  &times;
+                </button>
+              </div>
+              <AiSidebar />
+            </aside>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="flex w-8 flex-shrink-0 items-center justify-center border-l border-(--color-border) bg-white text-sm text-slate-500 hover:bg-slate-100"
+              aria-label="Open sidebar"
+            >
+              &lsaquo;
+            </button>
+          )}
+        </div>
       </div>
     </main>
   );

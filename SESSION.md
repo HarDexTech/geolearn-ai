@@ -1,44 +1,43 @@
-# Session Report — Backend & Frontend Fixes
+# Session Report — 7 UX Fixes
 
-## Backend Fixes
+## Fix 1 — Loading state on project open
+**File:** `frontend/app/workspace/page.tsx`
 
-### Fix 1 — CORS Configuration
-**Files:** `backend/main.py`
+Added `openingProjectId` state. Open buttons are now `<button>` not `<Link>` — when clicked, `openingProjectId` is set before `router.push`. All Open buttons and New Project button are disabled during navigation. The clicked button shows "Opening..." with `opacity-50`.
 
-Added `PATCH` to `allow_methods` in CORS configuration. The workspace auto-save uses PATCH, which was silently failing due to CORS.
+## Fix 2 — Don't redirect on network errors
+**File:** `frontend/app/workspace/[id]/page.tsx`
 
-### Fix 2 — Hanging API Requests
-**Files:** `backend/auth.py`, `backend/routers/workspace.py`
+The `catch` block now checks `err.message.includes("404")` — only redirects to `/workspace` on genuine 404. All other errors (timeout, connection refused) show an error banner at the top with Retry and "Back to Projects" buttons. The workspace layout remains visible behind the banner.
 
-Workspace API endpoints (`GET /api/workspace/projects`, etc.) were hanging indefinitely when the backend process died or became unresponsive. The root cause was a combination of JWKS fetch latency during auth and DB connection pool issues causing the process to crash silently.
+## Fix 3 — Prevent StrictMode double-fetch
+**File:** `frontend/app/workspace/[id]/page.tsx`
 
-## Frontend Fixes
+Added `hasFetchedRef` (`useRef(false)`). The load effect checks `if (hasFetchedRef.current) return` and sets it `true` before the async call. Cleanup resets it to `false` so it works correctly when `workspaceIdNum` changes.
 
-### Fix 1 — API Timeout
-**Files:** `frontend/lib/api.ts`
+## Fix 4 — Optimistic project list update
+**File:** `frontend/app/workspace/page.tsx`
 
-Added 15-second timeout to the `request()` function using `AbortController`. When the backend is unreachable, fetches now throw a clear "Request timed out" error after 15 seconds instead of hanging forever. The error is caught and displayed in the UI with a Retry button.
+After `createProject` resolves, the new project is prepended to local state via `setProjects(prev => [newProject, ...prev])`. If the user navigates back to `/workspace` quickly, the new project appears instantly without a refetch.
 
-### Fix 2 — Preserve layer visibility state
-**Files:** `frontend/app/workspace/[id]/page.tsx`
+## Fix 5 — Back button in workspace header
+**File:** `frontend/app/workspace/[id]/page.tsx`
 
-Changed `addLayer({ ...layer, visible: true })` → `addLayer(layer)`. Backend already returns correct `visible` field.
+The GeoLearn AI link now points to `/workspace` with a `←` chevron before the logo text. Breadcrumb reads: `← GeoLearn AI / Project Name`.
 
-### Fix 3 — Show project name in workspace header
-**Files:** `backend/routers/workspace.py`, `frontend/lib/api.ts`, `frontend/app/workspace/[id]/page.tsx`
+## Fix 6 — Map basemap
+**File:** `frontend/components/workspace/MapView.tsx`
 
-Added `project_name` field to workspace serialization. Header now shows the actual project name after refresh.
+Changed from `demotiles.maplibre.org/style.json` (blank demo tiles) to `tiles.openfreemap.org/styles/liberty` (free, production-ready map with roads, labels, terrain — no API key required).
 
-### Fix 4 — Remove dead dashboard page
-**File:** `frontend/app/dashboard/page.tsx` (deleted)
+## Fix 7 — Collapsible AI sidebar + bottom panel
+**File:** `frontend/app/workspace/[id]/page.tsx`
 
-Old Groq/YouTube API wiring, dead attack surface.
-
-### Fix 5 — Error logging and retry
-**Files:** `frontend/app/workspace/page.tsx`
-
-Added `console.error` logging when project fetch fails. Added Retry button in error banner so users can retry without refreshing the page.
+Added `sidebarOpen` and `bottomPanelOpen` state (both default `true`). Each panel has a close button (×). When closed:
+- Sidebar collapses to an 32px-wide `‹` button strip
+- Bottom panel collapses to a small "▲ Open Code Editor/Terminal" bar
+- CSS `transition-all duration-200` on the bottom panel height
 
 ## Build
 
-`npm run build` passes clean with all 9 routes. No TypeScript errors.
+`npm run build` passes clean. No TypeScript errors.
