@@ -453,7 +453,6 @@ export default function TutorPage() {
           <span className="border-b-2 border-(--color-primary) pb-1 text-slate-900">
             Tutor
           </span>
-          <Link href="/about">About</Link>
         </nav>
         <div className="flex items-center gap-2">
           <button
@@ -502,13 +501,6 @@ export default function TutorPage() {
               className="block rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-slate-900"
             >
               Tutor
-            </Link>
-            <Link
-              href="/about"
-              onClick={() => setMobileNavOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              About
             </Link>
           </nav>
         </div>

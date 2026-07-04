@@ -20,7 +20,6 @@ export default function Home() {
           <Link href="/workspace">Workspace</Link>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
-          <Link href="/about">About</Link>
         </nav>
         <Show when="signed-out">
           <Link

@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useAuth, UserButton } from "@clerk/nextjs";
 import { useWorkspaceStore } from "@/lib/workspace-store";
 import { getWorkspace, updateWorkspace } from "@/lib/api";
+import BackButton from "@/components/BackButton";
 
 const MapView = dynamic(() => import("@/components/workspace/MapView"), {
   ssr: false,
@@ -64,7 +64,9 @@ export default function WorkspacePage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("404")) {
-        router.push("/workspace");
+        setError("Workspace not found. Redirecting to your projects...");
+        setTimeout(() => router.push("/workspace"), 2500);
+        return;
       } else {
         console.error("[Workspace] Load error:", err);
         setError(msg || "Failed to load workspace. Check that the backend is running.");
@@ -123,19 +125,9 @@ export default function WorkspacePage() {
 
   return (
     <main className="flex h-screen flex-col bg-(--color-bg) text-(--color-text)">
-      <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-(--color-border) bg-white px-4">
+      <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-(--color-border) bg-white px-4">
         <div className="flex items-center gap-2">
-          <Link
-            href="/workspace"
-            className="flex items-center gap-1 text-lg font-bold tracking-tight text-(--color-primary)"
-          >
-            <span aria-hidden="true">&larr;</span>
-            GeoLearn AI
-          </Link>
-          <span className="text-sm font-semibold text-slate-500">/</span>
-          <span className="text-sm font-semibold text-slate-700">
-            {projectName || "Workspace"}
-          </span>
+          <BackButton href="/workspace" label="Projects" />
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -175,7 +167,7 @@ export default function WorkspacePage() {
       ) : null}
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0">
           <div className="flex-1">
             <MapView />
           </div>

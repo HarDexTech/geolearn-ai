@@ -102,7 +102,6 @@ export default function WorkspacePage() {
           </span>
           <Link href="/datasets">Datasets</Link>
           <Link href="/tutor">Tutor</Link>
-          <Link href="/about">About</Link>
         </nav>
         <div className="flex items-center gap-2">
           <button
@@ -151,13 +150,6 @@ export default function WorkspacePage() {
               className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Tutor
-            </Link>
-            <Link
-              href="/about"
-              onClick={() => setMobileNavOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              About
             </Link>
           </nav>
         </div>
