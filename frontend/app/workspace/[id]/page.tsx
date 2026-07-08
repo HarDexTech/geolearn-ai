@@ -31,6 +31,8 @@ export default function WorkspacePage() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -41,6 +43,7 @@ export default function WorkspacePage() {
   const setCode = useWorkspaceStore((s) => s.setCode);
   const addLayer = useWorkspaceStore((s) => s.addLayer);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
+  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const resetWorkspace = useWorkspaceStore((s) => s.resetWorkspace);
 
   const workspaceIdNum = Number(params.id);
@@ -113,15 +116,21 @@ export default function WorkspacePage() {
   }, [code, workspaceIdNum, getToken]);
 
   const handleSave = useCallback(async () => {
-    if (!workspaceIdNum) return;
+    if (!workspaceIdNum || isSaving) return;
+    setIsSaving(true);
+    setSaveMessage(null);
     try {
       const token = await getToken();
       if (!token) return;
       await updateWorkspace(workspaceIdNum, { code }, token);
+      setSaveMessage("Saved");
+      setTimeout(() => setSaveMessage(null), 2000);
     } catch {
       // Silent save failure.
+    } finally {
+      setIsSaving(false);
     }
-  }, [workspaceIdNum, code, getToken]);
+  }, [workspaceIdNum, code, getToken, isSaving]);
 
   return (
     <main className="flex h-screen flex-col bg-(--color-bg) text-(--color-text)">
@@ -133,9 +142,22 @@ export default function WorkspacePage() {
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-(--color-primary) px-4 py-1.5 text-sm font-semibold text-white"
+            disabled={isSaving}
+            className="flex items-center gap-1.5 rounded-lg bg-(--color-primary) px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-70 transition-opacity"
           >
-            Save
+            {isSaving ? (
+              <>
+                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Saving...
+              </>
+            ) : saveMessage ? (
+              "✓ Saved"
+            ) : (
+              "Save"
+            )}
           </button>
           <UserButton />
         </div>
@@ -174,9 +196,22 @@ export default function WorkspacePage() {
           <div className={`border-t border-(--color-border) bg-white transition-all duration-200 ${bottomPanelOpen ? 'h-[45%]' : 'h-0 overflow-hidden'}`}>
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between border-b border-(--color-border) bg-slate-50 px-3 py-1 flex-shrink-0">
-                <span className="text-xs font-semibold text-slate-500">
-                  {activeTab === "editor" ? "Code Editor" : "Terminal"}
-                </span>
+                <div className="flex rounded-md border border-(--color-border) text-xs font-semibold overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("editor")}
+                    className={`px-3 py-1 ${activeTab === "editor" ? "bg-(--color-primary) text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Editor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("terminal")}
+                    className={`px-3 py-1 ${activeTab === "terminal" ? "bg-(--color-primary) text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    Terminal
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setBottomPanelOpen(false)}
@@ -205,7 +240,7 @@ export default function WorkspacePage() {
 
         <div className="relative flex">
           {sidebarOpen ? (
-            <aside className="w-[360px] flex-shrink-0 border-l border-(--color-border) bg-white">
+            <aside className="w-[360px] flex-shrink-0 border-l border-(--color-border) bg-white flex flex-col overflow-hidden">
               <div className="flex items-center justify-between border-b border-(--color-border) px-3 py-2">
                 <span className="text-xs font-semibold text-slate-500">AI Assistant</span>
                 <button

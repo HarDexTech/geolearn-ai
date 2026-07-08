@@ -1,43 +1,37 @@
-# Session Report — 7 UX Fixes
+# Session 2026-07-08
 
-## Fix 1 — Loading state on project open
-**File:** `frontend/app/workspace/page.tsx`
+## Backend unresponsive fix
 
-Added `openingProjectId` state. Open buttons are now `<button>` not `<Link>` — when clicked, `openingProjectId` is set before `router.push`. All Open buttons and New Project button are disabled during navigation. The clicked button shows "Opening..." with `opacity-50`.
+- **Root cause**: uvicorn started from wrong working directory (not `backend/`), worker crashed on `ModuleNotFoundError` but parent kept port 8000 LISTENING, creating an infinite crash-restart loop.
+- **Fix**: Killed stuck processes, restarted from `backend/` directory without `--reload` flag (WatchFiles reloader was hanging on async lifespan startup).
 
-## Fix 2 — Don't redirect on network errors
-**File:** `frontend/app/workspace/[id]/page.tsx`
+## Frontend fixes
 
-The `catch` block now checks `err.message.includes("404")` — only redirects to `/workspace` on genuine 404. All other errors (timeout, connection refused) show an error banner at the top with Retry and "Back to Projects" buttons. The workspace layout remains visible behind the banner.
+### Move tab switcher from CodeEditor.tsx to workspace page
+- Removed Editor/Terminal tab buttons from `components/workspace/CodeEditor.tsx` — component now has only Monaco editor + Run button.
+- Added tab switcher to bottom panel header in `app/workspace/[id]/page.tsx`.
+- `setActiveTab` auto-switch on Run still works (stays in CodeEditor.tsx).
 
-## Fix 3 — Prevent StrictMode double-fetch
-**File:** `frontend/app/workspace/[id]/page.tsx`
+### Sidebar overflow fix
+- Added `flex flex-col overflow-hidden` to `<aside>` in `app/workspace/[id]/page.tsx:212`.
+- AiSidebar.tsx root already had `flex h-full flex-col` — no change needed.
 
-Added `hasFetchedRef` (`useRef(false)`). The load effect checks `if (hasFetchedRef.current) return` and sets it `true` before the async call. Cleanup resets it to `false` so it works correctly when `workspaceIdNum` changes.
+### Save button loading state
+- Added `isSaving` and `saveMessage` state.
+- Button shows spinner + "Saving..." during updateWorkspace call, then "✓ Saved" for 2s.
 
-## Fix 4 — Optimistic project list update
-**File:** `frontend/app/workspace/page.tsx`
+### Delete dead files
+- Deleted `frontend/app/about/page.tsx` and all nav references to `/about`.
+- Deleted `frontend/app/dashboard/` (empty directory).
+- Deleted `test_conversation_ordering.db` from repo root.
 
-After `createProject` resolves, the new project is prepended to local state via `setProjects(prev => [newProject, ...prev])`. If the user navigates back to `/workspace` quickly, the new project appears instantly without a refetch.
+### Sidebar overflow fix (CSS)
+- Added `min-w-0` to left content div, `overflow-hidden` to outer flex container.
+- Removed `overflow-x: hidden` from `body` in globals.css.
 
-## Fix 5 — Back button in workspace header
-**File:** `frontend/app/workspace/[id]/page.tsx`
+### 404 UX
+- Workspace load 404 now shows error banner "Workspace not found. Redirecting to your projects..." for 2.5s before router.push.
 
-The GeoLearn AI link now points to `/workspace` with a `←` chevron before the logo text. Breadcrumb reads: `← GeoLearn AI / Project Name`.
-
-## Fix 6 — Map basemap
-**File:** `frontend/components/workspace/MapView.tsx`
-
-Changed from `demotiles.maplibre.org/style.json` (blank demo tiles) to `tiles.openfreemap.org/styles/liberty` (free, production-ready map with roads, labels, terrain — no API key required).
-
-## Fix 7 — Collapsible AI sidebar + bottom panel
-**File:** `frontend/app/workspace/[id]/page.tsx`
-
-Added `sidebarOpen` and `bottomPanelOpen` state (both default `true`). Each panel has a close button (×). When closed:
-- Sidebar collapses to an 32px-wide `‹` button strip
-- Bottom panel collapses to a small "▲ Open Code Editor/Terminal" bar
-- CSS `transition-all duration-200` on the bottom panel height
-
-## Build
-
-`npm run build` passes clean. No TypeScript errors.
+### BackButton component
+- Created `components/BackButton.tsx` — animated green slide arrow button.
+- Used via `<BackButton href="/workspace" label="Projects" />` in workspace header.

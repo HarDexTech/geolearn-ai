@@ -19,9 +19,8 @@ export default function CodeEditor() {
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const isCodeRunning = useWorkspaceStore((s) => s.isCodeRunning);
   const setCodeRunning = useWorkspaceStore((s) => s.setCodeRunning);
-  const activeTab = useWorkspaceStore((s) => s.activeTab);
-  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const setTerminalOutput = useWorkspaceStore((s) => s.setTerminalOutput);
+  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
 
   const handleRun = useCallback(async () => {
     if (isCodeRunning || workspaceId === null) return;
@@ -73,7 +72,7 @@ export default function CodeEditor() {
           }}
         />
       </div>
-      <div className="flex items-center justify-between border-t border-(--color-border) bg-slate-50 px-3 py-2">
+      <div className="flex items-center border-t border-(--color-border) bg-slate-50 px-3 py-2">
         <button
           type="button"
           onClick={handleRun}
@@ -82,30 +81,6 @@ export default function CodeEditor() {
         >
           {isCodeRunning ? "Running..." : "Run"}
         </button>
-        <div className="flex rounded-lg border border-(--color-border) text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setActiveTab("editor")}
-            className={`px-3 py-1.5 ${
-              activeTab === "editor"
-                ? "bg-(--color-primary) text-white"
-                : "bg-white text-slate-600"
-            }`}
-          >
-            Editor
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("terminal")}
-            className={`px-3 py-1.5 ${
-              activeTab === "terminal"
-                ? "bg-(--color-primary) text-white"
-                : "bg-white text-slate-600"
-            }`}
-          >
-            Terminal
-          </button>
-        </div>
       </div>
     </div>
   );
