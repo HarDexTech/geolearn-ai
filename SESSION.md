@@ -35,3 +35,29 @@
 ### BackButton component
 - Created `components/BackButton.tsx` — animated green slide arrow button.
 - Used via `<BackButton href="/workspace" label="Projects" />` in workspace header.
+
+### Loading state (workspace UI flash fix)
+- Added `isLoaded` state — set to `true` after successful API fetch, `false` on navigation.
+- Main content area now shows three exclusive states:
+  - `error` → centered error message with Retry/Back buttons, **no workspace content**
+  - `!isLoaded` → "Loading workspace..." spinner
+  - `isLoaded` → full workspace (map, editor, sidebar)
+- Previously `!isLoaded && !error` showed spinner, but `error` fell through to workspace content.
+
+### Auth/security: workspace access control
+- Auth errors (401, 403, "unauthorized", "Invalid or missing") now redirect to `/workspace` **immediately** — no delay, no error banner, no workspace content rendered.
+- Unauthenticated users: Clerk middleware protects `/workspace/*` route before page renders.
+- Authenticated user accessing wrong workspace: backend returns 403 → frontend redirects instantly without loading map/editor/sidebar.
+- Old error banner at top of page removed — error state takes over the full content area.
+
+## Scenario verification report
+
+### Scenario 1: Navigate to own workspace
+- Flow: Page loads → "Loading workspace..." spinner appears → API returns 200 → `isLoaded = true` → full workspace (map, editor, sidebar) renders.
+- No flash of empty UI at any point.
+- Observable: spinner for ~200-500ms, then workspace appears.
+
+### Scenario 2: Navigate to unowned workspace (`/workspace/1`)
+- Flow: Page loads → "Loading workspace..." spinner appears briefly → API returns 403 → `router.push("/workspace")` fires immediately.
+- Map, editor, and sidebar **never render** — only spinner visible, then redirect.
+- No error banner shown, no wasted resource load.
