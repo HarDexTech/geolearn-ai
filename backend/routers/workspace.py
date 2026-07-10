@@ -98,6 +98,7 @@ def _serialize_workspace(workspace: Workspace) -> dict:
                 "visible": layer.visible,
                 "style": layer.style,
                 "metadata": layer.metadata_,
+                "file_url": layer.file_url,
             }
             for layer in workspace.layers
         ],

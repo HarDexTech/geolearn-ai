@@ -41,8 +41,8 @@ export default function Home() {
             <span className="text-emerald-700">Built for Nigeria</span>
           </h1>
           <p className="mt-7 max-w-xl text-xl leading-8 text-slate-600">
-            Find free Nigerian geospatial datasets and get instant AI help with
-            QGIS, ArcGIS, and remote sensing workflows.
+            Analyse satellite data, run geospatial code, and get AI assistance —
+            built for Nigerian GIS students and professionals.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
@@ -86,21 +86,21 @@ export default function Home() {
       <section className="bg-(--color-primary) py-10 text-white">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 md:grid-cols-3">
           <article>
-            <p className="text-6xl font-black">90%</p>
+            <p className="text-6xl font-black">4.6 hours</p>
             <p className="text-sm uppercase tracking-widest text-emerald-100">
-              Of GIS students struggle finding datasets
+              Average time lost per week on GIS problems that AI could solve
             </p>
           </article>
           <article>
-            <p className="text-6xl font-black">100%</p>
+            <p className="text-6xl font-black">80%</p>
             <p className="text-sm uppercase tracking-widest text-emerald-100">
-              Found an AI tutor useful
+              Struggle to find Nigerian satellite data and shapefiles
             </p>
           </article>
           <article>
-            <p className="text-6xl font-black">10,000+</p>
+            <p className="text-6xl font-black">9/10</p>
             <p className="text-sm uppercase tracking-widest text-emerald-100">
-              Nigerian GIS students
+              Would test a new AI-powered GIS tool immediately
             </p>
           </article>
         </div>

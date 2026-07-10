@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useAuth, useUser, UserButton } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,16 +12,13 @@ import {
   deleteSession,
   getSessionMessages,
   getSessions,
-  getYoutubeVideos,
   SessionItem,
-  YoutubeVideo,
 } from "@/lib/api";
 
 type Message = {
   id: string;
   question: string;
   answer: string;
-  videos: YoutubeVideo[];
 };
 
 type SessionMessagesCache = Record<string, Message[]>;
@@ -257,7 +253,6 @@ export default function TutorPage() {
         id: String(message.id),
         question: message.question,
         answer: message.answer,
-        videos: [],
       }));
       setMessages(mappedMessages);
       setSessionMessagesCache((prev) => ({
@@ -376,7 +371,6 @@ export default function TutorPage() {
           id: tempMessageId,
           question,
           answer: "",
-          videos: [],
         },
       ]);
 
@@ -416,19 +410,6 @@ export default function TutorPage() {
           throw new Error(event.message);
         },
       );
-
-      try {
-        const youtube = await getYoutubeVideos(question, token);
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === finalMessageId
-              ? { ...message, videos: youtube.results }
-              : message,
-          ),
-        );
-      } catch {
-        // YouTube is best-effort; do not block tutor response.
-      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -621,42 +602,6 @@ export default function TutorPage() {
                     {message.answer}
                   </ReactMarkdown>
                 </div>
-                {message.videos.length ? (
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      Recommended Tutorials
-                    </p>
-                    <div className="mt-2 grid gap-3 md:grid-cols-2">
-                      {message.videos.map((video) => (
-                        <a
-                          key={video.video_url}
-                          href={video.video_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-lg border border-(--color-border) p-2"
-                        >
-                          {video.thumbnail ? (
-                            <Image
-                              loader={({ src }) => src}
-                              unoptimized
-                              src={video.thumbnail}
-                              alt={video.title}
-                              width={320}
-                              height={160}
-                              className="h-28 w-full rounded object-cover"
-                            />
-                          ) : null}
-                          <p className="mt-2 line-clamp-2 text-sm font-semibold">
-                            {video.title}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {video.channel}
-                          </p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"

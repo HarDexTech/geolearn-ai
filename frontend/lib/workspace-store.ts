@@ -8,6 +8,7 @@ export type Layer = {
   visible: boolean;
   style: object | null;
   metadata: object | null;
+  file_url?: string | null;
 };
 
 export type Message = {

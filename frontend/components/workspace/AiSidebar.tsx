@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { useWorkspaceStore, Message } from "@/lib/workspace-store";
-import { runAgentStream } from "@/lib/api";
+import { runAgentStream, runCode } from "@/lib/api";
 
 export default function AiSidebar() {
   const { getToken } = useAuth();
@@ -16,6 +16,9 @@ export default function AiSidebar() {
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const isAgentRunning = useWorkspaceStore((s) => s.isAgentRunning);
   const setAgentRunning = useWorkspaceStore((s) => s.setAgentRunning);
+  const setCodeRunning = useWorkspaceStore((s) => s.setCodeRunning);
+  const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
+  const setTerminalOutput = useWorkspaceStore((s) => s.setTerminalOutput);
   const [input, setInput] = useState("");
   const messageListRef = useRef<HTMLDivElement>(null);
   const [expandedResults, setExpandedResults] = useState<Record<string, boolean>>({});
@@ -52,10 +55,10 @@ export default function AiSidebar() {
       const token = await getToken();
       if (!token) throw new Error("Unable to authenticate.");
 
-      let lastMessageId = placeholderId;
+      const lastMessageId = placeholderId;
 
       await runAgentStream(
-        { workspace_id: workspaceId, message: text },
+        { workspace_id: workspaceId, message: text, auto_run: false },
         token,
         (event) => {
           if (event.type === "chunk") {
@@ -129,6 +132,80 @@ export default function AiSidebar() {
     [handleSend],
   );
 
+  const handleRunGeneratedCode = useCallback(
+    async (messageId: string, code: string) => {
+      if (!workspaceId) return;
+
+      setCodeRunning(true);
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("Unable to authenticate.");
+
+        const result = await runCode(
+          { workspace_id: workspaceId, code, timeout: 30 },
+          token,
+        );
+
+        const terminalText = [
+          result.stdout,
+          result.stderr ? `STDERR:\n${result.stderr}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+        setTerminalOutput(terminalText);
+        setActiveTab("terminal");
+
+        useWorkspaceStore.setState((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  executionResult: {
+                    stdout: result.stdout,
+                    stderr: result.stderr,
+                    exit_code: result.exit_code,
+                    duration_ms: result.duration_ms,
+                  },
+                }
+              : m,
+          ),
+        }));
+      } catch (err) {
+        useWorkspaceStore.setState((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  executionResult: {
+                    stdout: "",
+                    stderr:
+                      err instanceof Error ? err.message : "Execution failed.",
+                    exit_code: 1,
+                    duration_ms: 0,
+                  },
+                }
+              : m,
+          ),
+        }));
+        setTerminalOutput(
+          err instanceof Error ? err.message : "Execution failed.",
+        );
+        setActiveTab("terminal");
+      } finally {
+        setCodeRunning(false);
+      }
+    },
+    [workspaceId, getToken, setCodeRunning, setTerminalOutput, setActiveTab],
+  );
+
+  const handleCopyCode = useCallback(async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      // Clipboard not available — silent fail.
+    }
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-3" ref={messageListRef}>
@@ -161,6 +238,25 @@ export default function AiSidebar() {
                   <pre className="mt-2 overflow-x-auto rounded bg-slate-100 p-2 text-xs font-mono text-slate-700">
                     {msg.code}
                   </pre>
+                )}
+                {msg.code && !msg.executionResult && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-(--color-border) bg-slate-50 p-2">
+                    <span className="text-xs text-slate-600 flex-1">AI generated code. Run it?</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleRunGeneratedCode(msg.id, msg.code!)}
+                      className="rounded-md bg-(--color-primary) px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      Run
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyCode(msg.code!)}
+                      className="rounded-md border border-(--color-border) bg-white px-2 py-1 text-xs font-semibold text-slate-600"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 )}
                 {msg.executionResult && (
                   <div className="mt-2">

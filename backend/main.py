@@ -1,24 +1,39 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
 
 from database import Base, engine
 from routers import agent, code_runner, data_connector, datasets, tutor, workspace
 
+
+def _init_db() -> None:
+    Base.metadata.create_all(bind=engine)
+    _ensure_session_schema()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        Base.metadata.create_all(bind=engine)
-        _ensure_session_schema()
+        await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, _init_db),
+            timeout=10.0,
+        )
+    except asyncio.TimeoutError:
+        if db_startup_strict:
+            raise RuntimeError("Database initialization timed out")
+        logging.warning(
+            "DB init timed out; continuing because DB_STARTUP_STRICT is disabled."
+        )
     except Exception as exc:
         if db_startup_strict:
             logging.exception("Startup DB init failed; refusing to start.")
             raise RuntimeError("Database initialization failed") from exc
-
         logging.exception(
             "Startup DB init failed; continuing because DB_STARTUP_STRICT is disabled."
         )
@@ -26,6 +41,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GeoLearn AI API", lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logging.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
 
 frontend_origin = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "http://localhost:3000")
 environment = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")).lower()

@@ -35,10 +35,8 @@ export default function WorkspacePage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
-  const projectName = useWorkspaceStore((s) => s.projectName);
-  const code = useWorkspaceStore((s) => s.code);
   const activeTab = useWorkspaceStore((s) => s.activeTab);
+  const code = useWorkspaceStore((s) => s.code);
 
   const setWorkspaceId = useWorkspaceStore((s) => s.setWorkspaceId);
   const setCode = useWorkspaceStore((s) => s.setCode);
