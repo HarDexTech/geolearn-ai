@@ -7,7 +7,7 @@ import { useAuth, UserButton } from "@clerk/nextjs";
 import { createProject, getProjects, Project } from "@/lib/api";
 
 export default function WorkspacePage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +36,9 @@ export default function WorkspacePage() {
   }, [getToken]);
 
   useEffect(() => {
+    if (!isLoaded) return;
     void fetchProjects();
-  }, [fetchProjects]);
+  }, [isLoaded, fetchProjects]);
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {

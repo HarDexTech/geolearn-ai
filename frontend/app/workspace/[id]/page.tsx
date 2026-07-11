@@ -23,7 +23,7 @@ const Terminal = dynamic(() => import("@/components/workspace/Terminal"), {
 });
 
 export default function WorkspacePage() {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded: isAuthLoaded } = useAuth();
   const params = useParams();
   const router = useRouter();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,7 +55,13 @@ export default function WorkspacePage() {
     try {
       const token = await getToken();
       if (!token) {
-        router.push("/sign-in");
+        // Only redirect to sign-in if Clerk has finished loading.
+        // During the brief window after signup/login when the session
+        // isn't fully established, getToken() can return null even
+        // though the user is authenticated. Bail out (without error)
+        // and let the effect re-fire when isAuthLoaded flips to true.
+        hasFetchedRef.current = false;
+        if (isAuthLoaded) router.push("/sign-in");
         return;
       }
       const data = await getWorkspace(workspaceIdNum, token);
@@ -78,10 +84,10 @@ export default function WorkspacePage() {
       console.error("[Workspace] Load error:", err);
       setError(msg || "Failed to load workspace. Check that the backend is running.");
     }
-  }, [workspaceIdNum, getToken, setWorkspaceId, setCode, addLayer, setProjectName, router]);
+  }, [workspaceIdNum, getToken, isAuthLoaded, setWorkspaceId, setCode, addLayer, setProjectName, router]);
 
   useEffect(() => {
-    if (!workspaceIdNum) return;
+    if (!workspaceIdNum || !isAuthLoaded) return;
     resetWorkspace();
     setIsLoaded(false);
     hasFetchedRef.current = false;
@@ -89,7 +95,7 @@ export default function WorkspacePage() {
     return () => {
       hasFetchedRef.current = false;
     };
-  }, [workspaceIdNum, load, resetWorkspace]);
+  }, [workspaceIdNum, isAuthLoaded, load, resetWorkspace]);
 
   useEffect(() => {
     if (!workspaceIdNum) return;
