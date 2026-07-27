@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Show } from "@/components/show";
 
-export default async function Home() {
-  const { userId } = await auth();
-  if (userId) redirect("/workspace");
+export default function Home() {
   return (
     <main className="min-h-screen bg-(--color-bg) text-(--color-text)">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6">
